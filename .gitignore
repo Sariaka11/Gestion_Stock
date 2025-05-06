@@ -1,0 +1,43 @@
+# Fichiers et dossiers de Visual Studio
+.vs/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# Build results
+bin/
+obj/
+out/
+
+# Fichiers de log et temporaires
+*.log
+*.tmp
+*.temp
+
+# Dossiers de dépendances
+packages/
+node_modules/
+
+# Configuration IDE
+*.ncb
+*.sdf
+*.cache
+*.dbmdl
+
+# Fichiers de publication
+*.Publish.xml
+*.pfx
+*.key
+
+# Fichiers de test
+TestResults/
+*.trx
+*.coverage
+*.coveragexml
+
+# Autres fichiers inutiles
+*.orig
+*.rej
+.DS_Store
+Thumbs.db

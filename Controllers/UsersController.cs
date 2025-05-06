@@ -39,76 +39,100 @@ namespace GestionFournituresAPI.Controllers
             return user;
         }
 
-       // GET: api/Users/5/Agence
-[HttpGet("{id}/Agence")]
-public async Task<ActionResult<Agence>> GetUserAgence(int id)
-{
-    try
-    {
-        // Vérifier si l'utilisateur existe
-        var user = await _context.Users.FindAsync(id);
-        if (user == null)
+        // GET: api/Users/5/Agence
+        [HttpGet("{id}/Agence")]
+        public async Task<IActionResult> GetUserAgence(int id)
         {
-            return NotFound($"Utilisateur avec ID {id} non trouvé.");
+            try
+            {
+                // Vérifier si l'utilisateur existe
+                var user = await _context.Users.FindAsync(id);
+                if (user == null)
+                {
+                    return NotFound("Utilisateur non trouvé.");
+                }
+
+                // Récupérer l'association utilisateur-agence
+                var userAgence = await _context.UserAgences
+                    .AsNoTracking()
+                    .FirstOrDefaultAsync(ua => ua.UserId == id);
+
+                if (userAgence == null)
+                {
+                    return NotFound("Cet utilisateur n'est associé à aucune agence.");
+                }
+
+                // Récupérer l'agence séparément
+                var agence = await _context.Agences
+                    .AsNoTracking()
+                    .FirstOrDefaultAsync(a => a.Id == userAgence.AgenceId);
+
+                if (agence == null)
+                {
+                    return NotFound("L'agence associée n'existe pas.");
+                }
+
+                // Retourner un objet anonyme simple
+                return Ok(new
+                {
+                    id = agence.Id,
+                    numero = agence.Numero,
+                    nom = agence.Nom
+                });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, $"Erreur interne: {ex.Message}");
+            }
         }
 
-        // Récupérer l'association utilisateur-agence
-        var userAgence = await _context.UserAgences
-            .Include(ua => ua.Agence)
-            .FirstOrDefaultAsync(ua => ua.UserId == id);
-
-        if (userAgence == null)
-        {
-            return NotFound($"Utilisateur avec ID {id} n'est associé à aucune agence.");
-        }
-
-        if (userAgence.Agence == null)
-        {
-            return NotFound($"L'agence associée à l'utilisateur avec ID {id} est introuvable.");
-        }
-
-        // Retourner l'agence
-        return Ok(userAgence.Agence);
-    }
-    catch (Exception ex)
-    {
-        // Log l'exception
-        Console.WriteLine($"Erreur dans GetUserAgence: {ex.Message}");
-        return StatusCode(500, "Une erreur interne s'est produite.");
-    }
-}
         // GET: api/Users/5/Fournitures
         [HttpGet("{id}/Fournitures")]
         public async Task<ActionResult<IEnumerable<Fourniture>>> GetUserFournitures(int id)
         {
-            var userFournitures = await _context.UserFournitures
-                .Include(uf => uf.Fourniture)
-                .Where(uf => uf.UserId == id)
-                .ToListAsync();
-
-            if (!userFournitures.Any())
+            try
             {
-                return NotFound("Cet utilisateur n'est associé à aucune fourniture.");
+                // Vérifier si l'utilisateur existe
+                var user = await _context.Users.FindAsync(id);
+                if (user == null)
+                {
+                    return NotFound("Utilisateur non trouvé.");
+                }
+
+                var userFournitures = await _context.UserFournitures
+                    .AsNoTracking()
+                    .Where(uf => uf.UserId == id)
+                    .ToListAsync();
+
+                if (!userFournitures.Any())
+                {
+                    return NotFound("Cet utilisateur n'est associé à aucune fourniture.");
+                }
+
+                // Récupérer les fournitures séparément
+                var fournitureIds = userFournitures.Select(uf => uf.FournitureId).ToList();
+                var fournitures = await _context.Fournitures
+                    .AsNoTracking()
+                    .Where(f => fournitureIds.Contains(f.Id))
+                    .ToListAsync();
+
+                if (!fournitures.Any())
+                {
+                    return NotFound("Aucune fourniture valide n'est associée à cet utilisateur.");
+                }
+
+                // Calculer le CMUP pour chaque fourniture
+                foreach (var fourniture in fournitures)
+                {
+                    fourniture.CMUP = CalculerCMUP(fourniture.Id);
+                }
+
+                return Ok(fournitures);
             }
-
-            // Filtrer les fournitures null et les convertir en liste
-            var fournitures = userFournitures
-                .Where(uf => uf.Fourniture != null)
-                .Select(uf => uf.Fourniture!)
-                .ToList();
-
-            if (!fournitures.Any())
+            catch (Exception ex)
             {
-                return NotFound("Aucune fourniture valide n'est associée à cet utilisateur.");
+                return StatusCode(500, $"Erreur interne: {ex.Message}");
             }
-
-            // Calculer le CMUP pour chaque fourniture
-            foreach (var fourniture in fournitures)
-            {
-                fourniture.CMUP = CalculerCMUP(fourniture.Id);
-            }
-
-            return fournitures;
         }
 
         // POST: api/Users
@@ -211,22 +235,35 @@ public async Task<ActionResult<Agence>> GetUserAgence(int id)
 
         // POST: api/Users/Login
         [HttpPost("Login")]
-        public async Task<ActionResult<User>> Login(LoginModel login)
+        [Consumes("application/json")] // Spécifier explicitement le type de média accepté
+        public async Task<ActionResult<User>> Login([FromBody] LoginModel login)
         {
-            var user = await _context.Users.FirstOrDefaultAsync(u => u.Email == login.Email);
-
-            if (user == null)
+            try
             {
-                return NotFound("Utilisateur non trouvé.");
-            }
+                if (login == null)
+                {
+                    return BadRequest("Les données de connexion sont requises.");
+                }
 
-            // Vérifier le mot de passe
-            if (!VerifyPassword(login.Password, user.MotDePasse))
+                var user = await _context.Users.FirstOrDefaultAsync(u => u.Email == login.Email);
+
+                if (user == null)
+                {
+                    return NotFound("Utilisateur non trouvé.");
+                }
+
+                // Vérifier le mot de passe
+                if (!VerifyPassword(login.Password, user.MotDePasse))
+                {
+                    return Unauthorized("Mot de passe incorrect.");
+                }
+
+                return Ok(user);
+            }
+            catch (Exception ex)
             {
-                return Unauthorized("Mot de passe incorrect.");
+                return StatusCode(500, $"Erreur interne: {ex.Message}");
             }
-
-            return user;
         }
 
         private bool UserExists(int id)
