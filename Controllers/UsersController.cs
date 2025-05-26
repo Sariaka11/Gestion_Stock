@@ -4,6 +4,10 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using System.Security.Cryptography;
 using System.Text;
+//using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authentication.Cookies;
+using System.Threading.Tasks;
 
 namespace GestionFournituresAPI.Controllers
 {
@@ -106,7 +110,7 @@ namespace GestionFournituresAPI.Controllers
 
                 if (!userFournitures.Any())
                 {
-                    return NotFound("Cet utilisateur n'est associé à aucune fourniture.");
+                    return Ok(new List<object>());
                 }
 
                 // Récupérer les fournitures séparément
@@ -152,6 +156,14 @@ namespace GestionFournituresAPI.Controllers
             await _context.SaveChangesAsync();
 
             return CreatedAtAction(nameof(GetUser), new { id = user.Id }, user);
+        }
+
+        [HttpPost("Logout")]
+        public async Task<IActionResult> Logout()
+        {
+            // Sign out the user by clearing the authentication cookie
+            await HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
+            return Ok(new { message = "Déconnexion réussie" });
         }
 
         // PUT: api/Users/5

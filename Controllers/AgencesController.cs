@@ -22,6 +22,31 @@ namespace GestionFournituresAPI.Controllers
         {
             return await _context.Agences.ToListAsync();
         }
+        // GET: api/Agences/5/Biens
+        [HttpGet("{id}/Biens")]
+        public async Task<ActionResult<IEnumerable<Immobilisation>>> GetAgenceBiens(int id)
+        {
+            if (!await _context.Agences.AnyAsync(a => a.Id == id))
+            {
+                return NotFound("L'agence spécifiée n'existe pas.");
+            }
+
+            // Récupérer les dernières affectations pour chaque bien dans cette agence
+            var dernieresAffectations = await _context.BienAgences
+                .Where(ba => ba.IdAgence == id)
+                .GroupBy(ba => ba.IdBien)
+                .Select(g => g.OrderByDescending(ba => ba.DateAffectation).First())
+                .ToListAsync();
+
+            // Récupérer les biens correspondants
+            var bienIds = dernieresAffectations.Select(ba => ba.IdBien).ToList();
+            var biens = await _context.Immobilisations
+                .Include(i => i.Categorie)
+                .Where(i => bienIds.Contains(i.IdBien))
+                .ToListAsync();
+
+            return biens;
+        }
 
         // GET: api/Agences/5
         [HttpGet("{id}")]

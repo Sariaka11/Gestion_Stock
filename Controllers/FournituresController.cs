@@ -21,13 +21,13 @@ namespace GestionFournituresAPI.Controllers
         public async Task<ActionResult<IEnumerable<Fourniture>>> GetFournitures()
         {
             var fournitures = await _context.Fournitures.ToListAsync();
-            
+
             // Calculer le CMUP pour chaque fourniture
             foreach (var fourniture in fournitures)
             {
                 fourniture.CMUP = CalculerCMUP(fourniture.Id);
             }
-            
+
             return fournitures;
         }
 
@@ -61,27 +61,27 @@ namespace GestionFournituresAPI.Controllers
                 // Mettre à jour la fourniture existante
                 existingFourniture.PrixUnitaire = fourniture.PrixUnitaire;
                 existingFourniture.Categorie = fourniture.Categorie;
-                
+
                 // Ajouter la nouvelle quantité à la quantité restante existante
                 existingFourniture.QuantiteRestante += fourniture.Quantite;
-                
+
                 // Mettre à jour la quantité totale
-                existingFourniture.Quantite += fourniture.Quantite;
-                
+                existingFourniture.Quantite = fourniture.Quantite;
+
                 // Recalculer les valeurs
                 existingFourniture.Montant = existingFourniture.PrixUnitaire * existingFourniture.Quantite;
                 existingFourniture.PrixTotal = existingFourniture.QuantiteRestante * existingFourniture.PrixUnitaire;
-                
+
                 // Mettre à jour la date
                 existingFourniture.Date = DateTime.Now;
 
                 try
                 {
                     await _context.SaveChangesAsync();
-                    
+
                     // Calculer le CMUP pour cette fourniture
                     existingFourniture.CMUP = CalculerCMUP(existingFourniture.Id);
-                    
+
                     return Ok(existingFourniture);
                 }
                 catch (DbUpdateConcurrencyException)
@@ -130,7 +130,7 @@ namespace GestionFournituresAPI.Controllers
 
             // Mettre à jour la quantité restante en fonction de la nouvelle quantité
             fourniture.QuantiteRestante = existingFourniture.QuantiteRestante + (fourniture.Quantite - existingFourniture.Quantite);
-            
+
             // Recalculer les valeurs
             CalculerValeurs(fourniture, false);
 
@@ -170,7 +170,7 @@ namespace GestionFournituresAPI.Controllers
             var associations = await _context.AgenceFournitures
                 .Where(af => af.FournitureId == id)
                 .ToListAsync();
-                
+
             _context.AgenceFournitures.RemoveRange(associations);
             _context.Fournitures.Remove(fourniture);
             await _context.SaveChangesAsync();

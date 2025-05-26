@@ -86,21 +86,24 @@ namespace GestionFournituresAPI.Controllers
             {
                 return Conflict("Cette association existe déjà.");
             }
-
+            agenceFourniture.DateAssociation = DateTime.Now;
             _context.AgenceFournitures.Add(agenceFourniture);
             await _context.SaveChangesAsync();
 
             return CreatedAtAction(nameof(GetAgenceFourniture), new { id = agenceFourniture.Id }, agenceFourniture);
         }
 
-        // DELETE: api/AgenceFournitures/5
-        [HttpDelete("{id}")]
-        public async Task<IActionResult> DeleteAgenceFourniture(int id)
+
+        // DELETE: api/AgenceFournitures/Agence/1/Fourniture/1
+        [HttpDelete("Agence/{agenceId}/Fourniture/{fournitureId}")]
+        public async Task<IActionResult> DeleteAgenceFourniture(int agenceId, int fournitureId)
         {
-            var agenceFourniture = await _context.AgenceFournitures.FindAsync(id);
+            var agenceFourniture = await _context.AgenceFournitures
+                .FirstOrDefaultAsync(af => af.AgenceId == agenceId && af.FournitureId == fournitureId);
+
             if (agenceFourniture == null)
             {
-                return NotFound();
+                return NotFound($"Association entre l'agence {agenceId} et la fourniture {fournitureId} non trouvée.");
             }
 
             _context.AgenceFournitures.Remove(agenceFourniture);
@@ -108,5 +111,11 @@ namespace GestionFournituresAPI.Controllers
 
             return NoContent();
         }
+
+        private bool AgenceFournitureExists(int agenceId, int fournitureId)
+        {
+            return _context.AgenceFournitures.Any(af => af.AgenceId == agenceId && af.FournitureId == fournitureId);
+        }
+
     }
 }

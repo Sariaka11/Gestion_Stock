@@ -44,10 +44,10 @@ namespace GestionFournituresAPI.Models
         [StringLength(100)]
         public string Categorie { get; set; } = string.Empty;
 
-        // Navigation properties
-        public virtual ICollection<AgenceFourniture>? AgenceFournitures { get; set; }
-        public virtual ICollection<UserFourniture>? UserFournitures { get; set; }
-        
+
+        // Ajout des propriétés de navigation
+        public virtual ICollection<AgenceFourniture> AgenceFournitures { get; set; } = new List<AgenceFourniture>();
+        public virtual ICollection<UserFourniture> UserFournitures { get; set; } = new List<UserFourniture>();
         // Propriété calculée pour le CMUP (non stockée en base de données)
         [NotMapped]
         public decimal CMUP { get; set; }

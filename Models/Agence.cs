@@ -3,7 +3,7 @@ using System.ComponentModel.DataAnnotations.Schema;
 
 namespace GestionFournituresAPI.Models
 {
-    [Table("AGENCES", Schema = "SYSTEM")]
+    [Table("AGENCES")]
     public class Agence
     {
         [Key]
@@ -12,16 +12,19 @@ namespace GestionFournituresAPI.Models
 
         [Required]
         [Column("NUMERO")]
-        [StringLength(50, MinimumLength = 1)]
+        [StringLength(50)]
         public string Numero { get; set; } = string.Empty;
-
+       
         [Required]
         [Column("NOM")]
-        [StringLength(100, MinimumLength = 1)]
+        [StringLength(100)]
         public string Nom { get; set; } = string.Empty;
 
-        // Navigation properties
-        public virtual ICollection<UserAgence>? UserAgences { get; set; }
-        public virtual ICollection<AgenceFourniture>? AgenceFournitures { get; set; }
+        // Propriétés de navigation
+        public virtual ICollection<UserAgence> UserAgences { get; set; } = new List<UserAgence>();
+        public virtual ICollection<AgenceFourniture> AgenceFournitures { get; set; } = new List<AgenceFourniture>();
+
+        // Nouvelle propriété de navigation pour les biens
+        public virtual ICollection<BienAgence> BienAgences { get; set; } = new List<BienAgence>();
     }
 }

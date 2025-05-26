@@ -18,6 +18,10 @@ namespace GestionFournituresAPI.Models
         [Column("FOURNITURE_ID")]
         public int FournitureId { get; set; }
 
+        [Required]
+        [Column("QUANTITE")]
+        public int Quantite { get; set; }
+
         [Column("DATE_ASSOCIATION")]
         public DateTime DateAssociation { get; set; } = DateTime.Now;
 

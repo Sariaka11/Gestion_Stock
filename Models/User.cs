@@ -35,8 +35,8 @@ namespace GestionFournituresAPI.Models
         [StringLength(100)]
         public string Fonction { get; set; } = string.Empty;
 
-        // Navigation properties
-        public virtual UserAgence? UserAgence { get; set; }
-        public virtual ICollection<UserFourniture>? UserFournitures { get; set; }
+        // Ajout des propriétés de navigation
+        public virtual ICollection<UserAgence> UserAgences { get; set; } = new List<UserAgence>();
+        public virtual ICollection<UserFourniture> UserFournitures { get; set; } = new List<UserFourniture>();
     }
 }
