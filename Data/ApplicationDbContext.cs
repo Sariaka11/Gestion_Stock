@@ -60,6 +60,13 @@ namespace GestionFournituresAPI.Data
                 .WithMany(u => u.UserAgences)
                 .HasForeignKey(ua => ua.UserId);
 
+            modelBuilder.Entity<UserAgence>(entity =>
+            {
+                entity.HasKey(e => e.Id);
+                entity.Property(e => e.Id)
+                      .ValueGeneratedOnAdd(); // Pour auto-increment
+            });
+
             modelBuilder.Entity<UserAgence>()
                 .HasOne(ua => ua.Agence)
                 .WithMany(a => a.UserAgences)

@@ -216,6 +216,13 @@ namespace GestionFournituresAPI.Controllers
             return NoContent();
         }
 
+        [HttpGet("check-email")]
+        public IActionResult CheckEmail(string email)
+        {
+            bool exists = _context.Users.Any(u => u.Email == email);
+            return Ok(new { exists });
+        }
+
         // DELETE: api/Users/5
         [HttpDelete("{id}")]
         public async Task<IActionResult> DeleteUser(int id)
