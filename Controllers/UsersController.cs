@@ -1,13 +1,13 @@
 using GestionFournituresAPI.Data;
+using GestionFournituresAPI.Dtos;
 using GestionFournituresAPI.Models;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using AutoMapper;
 using System.Security.Cryptography;
 using System.Text;
-//using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
-using System.Threading.Tasks;
 
 namespace GestionFournituresAPI.Controllers
 {
@@ -16,31 +16,32 @@ namespace GestionFournituresAPI.Controllers
     public class UsersController : ControllerBase
     {
         private readonly ApplicationDbContext _context;
+        private readonly IMapper _mapper;
 
-        public UsersController(ApplicationDbContext context)
+        public UsersController(ApplicationDbContext context, IMapper mapper)
         {
             _context = context;
+            _mapper = mapper;
         }
 
         // GET: api/Users
         [HttpGet]
-        public async Task<ActionResult<IEnumerable<User>>> GetUsers()
+        public async Task<ActionResult<IEnumerable<UserDto>>> GetUsers()
         {
-            return await _context.Users.ToListAsync();
+            var users = await _context.Users.ToListAsync();
+            return _mapper.Map<List<UserDto>>(users);
         }
 
         // GET: api/Users/5
         [HttpGet("{id}")]
-        public async Task<ActionResult<User>> GetUser(int id)
+        public async Task<ActionResult<UserDto>> GetUser(int id)
         {
             var user = await _context.Users.FindAsync(id);
-
             if (user == null)
             {
                 return NotFound();
             }
-
-            return user;
+            return _mapper.Map<UserDto>(user);
         }
 
         // GET: api/Users/5/Agence
@@ -76,13 +77,8 @@ namespace GestionFournituresAPI.Controllers
                     return NotFound("L'agence associée n'existe pas.");
                 }
 
-                // Retourner un objet anonyme simple
-                return Ok(new
-                {
-                    id = agence.Id,
-                    numero = agence.Numero,
-                    nom = agence.Nom
-                });
+                // Retourner l'AgenceDto
+                return Ok(_mapper.Map<AgenceDto>(agence));
             }
             catch (Exception ex)
             {
@@ -92,7 +88,7 @@ namespace GestionFournituresAPI.Controllers
 
         // GET: api/Users/5/Fournitures
         [HttpGet("{id}/Fournitures")]
-        public async Task<ActionResult<IEnumerable<Fourniture>>> GetUserFournitures(int id)
+        public async Task<ActionResult<IEnumerable<FournitureDto>>> GetUserFournitures(int id)
         {
             try
             {
@@ -110,7 +106,7 @@ namespace GestionFournituresAPI.Controllers
 
                 if (!userFournitures.Any())
                 {
-                    return Ok(new List<object>());
+                    return Ok(new List<FournitureDto>());
                 }
 
                 // Récupérer les fournitures séparément
@@ -126,12 +122,13 @@ namespace GestionFournituresAPI.Controllers
                 }
 
                 // Calculer le CMUP pour chaque fourniture
-                foreach (var fourniture in fournitures)
+                var fournitureDtos = _mapper.Map<List<FournitureDto>>(fournitures);
+                foreach (var fournitureDto in fournitureDtos)
                 {
-                    fourniture.CMUP = CalculerCMUP(fourniture.Id);
+                    fournitureDto.CMUP = CalculerCMUP(fournitureDto.Id);
                 }
 
-                return Ok(fournitures);
+                return Ok(fournitureDtos);
             }
             catch (Exception ex)
             {
@@ -141,7 +138,7 @@ namespace GestionFournituresAPI.Controllers
 
         // POST: api/Users
         [HttpPost]
-        public async Task<ActionResult<User>> PostUser(User user)
+        public async Task<ActionResult<UserDto>> PostUser(User user)
         {
             // Vérifier si l'email existe déjà
             if (await _context.Users.AnyAsync(u => u.Email == user.Email))
@@ -155,13 +152,13 @@ namespace GestionFournituresAPI.Controllers
             _context.Users.Add(user);
             await _context.SaveChangesAsync();
 
-            return CreatedAtAction(nameof(GetUser), new { id = user.Id }, user);
+            return CreatedAtAction(nameof(GetUser), new { id = user.Id }, _mapper.Map<UserDto>(user));
         }
 
+        // POST: api/Users/Logout
         [HttpPost("Logout")]
         public async Task<IActionResult> Logout()
         {
-            // Sign out the user by clearing the authentication cookie
             await HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
             return Ok(new { message = "Déconnexion réussie" });
         }
@@ -247,8 +244,8 @@ namespace GestionFournituresAPI.Controllers
 
         // POST: api/Users/Login
         [HttpPost("Login")]
-        [Consumes("application/json")] // Spécifier explicitement le type de média accepté
-        public async Task<ActionResult<User>> Login([FromBody] LoginModel login)
+        [Consumes("application/json")]
+        public async Task<ActionResult<UserDto>> Login([FromBody] LoginModel login)
         {
             try
             {
@@ -258,7 +255,6 @@ namespace GestionFournituresAPI.Controllers
                 }
 
                 var user = await _context.Users.FirstOrDefaultAsync(u => u.Email == login.Email);
-
                 if (user == null)
                 {
                     return NotFound("Utilisateur non trouvé.");
@@ -270,7 +266,7 @@ namespace GestionFournituresAPI.Controllers
                     return Unauthorized("Mot de passe incorrect.");
                 }
 
-                return Ok(user);
+                return Ok(_mapper.Map<UserDto>(user));
             }
             catch (Exception ex)
             {
@@ -303,10 +299,8 @@ namespace GestionFournituresAPI.Controllers
             return hashedInput == hashedPassword;
         }
 
-        // Méthode pour calculer le CMUP (Coût Moyen Unitaire Pondéré)
         private decimal CalculerCMUP(int fournitureId)
         {
-            // Récupérer toutes les fournitures du même type (même nom)
             var fourniture = _context.Fournitures.Find(fournitureId);
             if (fourniture == null)
             {
@@ -322,7 +316,6 @@ namespace GestionFournituresAPI.Controllers
                 return 0;
             }
 
-            // Calculer le CMUP: Somme(Quantité * Prix Unitaire) / Somme(Quantité)
             decimal sommeProduits = fournituresMemeType.Sum(f => f.QuantiteRestante * f.PrixUnitaire);
             int sommeQuantites = fournituresMemeType.Sum(f => f.QuantiteRestante);
 

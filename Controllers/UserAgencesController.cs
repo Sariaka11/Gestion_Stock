@@ -1,7 +1,9 @@
 using GestionFournituresAPI.Data;
+using GestionFournituresAPI.Dtos;
 using GestionFournituresAPI.Models;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using AutoMapper;
 
 namespace GestionFournituresAPI.Controllers
 {
@@ -10,25 +12,28 @@ namespace GestionFournituresAPI.Controllers
     public class UserAgencesController : ControllerBase
     {
         private readonly ApplicationDbContext _context;
+        private readonly IMapper _mapper;
 
-        public UserAgencesController(ApplicationDbContext context)
+        public UserAgencesController(ApplicationDbContext context, IMapper mapper)
         {
             _context = context;
+            _mapper = mapper;
         }
 
         // GET: api/UserAgences
         [HttpGet]
-        public async Task<ActionResult<IEnumerable<UserAgence>>> GetUserAgences()
+        public async Task<ActionResult<IEnumerable<UserAgenceDto>>> GetUserAgences()
         {
-            return await _context.UserAgences
+            var userAgences = await _context.UserAgences
                 .Include(ua => ua.User)
                 .Include(ua => ua.Agence)
                 .ToListAsync();
+            return _mapper.Map<List<UserAgenceDto>>(userAgences);
         }
 
         // GET: api/UserAgences/5
         [HttpGet("{id}")]
-        public async Task<ActionResult<UserAgence>> GetUserAgence(int id)
+        public async Task<ActionResult<UserAgenceDto>> GetUserAgence(int id)
         {
             var userAgence = await _context.UserAgences
                 .Include(ua => ua.User)
@@ -40,12 +45,12 @@ namespace GestionFournituresAPI.Controllers
                 return NotFound();
             }
 
-            return userAgence;
+            return _mapper.Map<UserAgenceDto>(userAgence);
         }
 
         // GET: api/UserAgences/ByUser/5
         [HttpGet("ByUser/{userId}")]
-        public async Task<ActionResult<UserAgence>> GetByUser(int userId)
+        public async Task<ActionResult<UserAgenceDto>> GetByUser(int userId)
         {
             var userAgence = await _context.UserAgences
                 .Include(ua => ua.Agence)
@@ -56,22 +61,23 @@ namespace GestionFournituresAPI.Controllers
                 return NotFound();
             }
 
-            return userAgence;
+            return _mapper.Map<UserAgenceDto>(userAgence);
         }
 
         // GET: api/UserAgences/ByAgence/5
         [HttpGet("ByAgence/{agenceId}")]
-        public async Task<ActionResult<IEnumerable<UserAgence>>> GetByAgence(int agenceId)
+        public async Task<ActionResult<IEnumerable<UserAgenceDto>>> GetByAgence(int agenceId)
         {
-            return await _context.UserAgences
+            var userAgences = await _context.UserAgences
                 .Include(ua => ua.User)
                 .Where(ua => ua.AgenceId == agenceId)
                 .ToListAsync();
+            return _mapper.Map<List<UserAgenceDto>>(userAgences);
         }
 
         // POST: api/UserAgences
         [HttpPost]
-        public async Task<ActionResult<UserAgence>> PostUserAgence(UserAgence userAgence)
+        public async Task<ActionResult<UserAgenceDto>> PostUserAgence(UserAgence userAgence)
         {
             // Vérifier si l'utilisateur existe
             if (!_context.Users.Any(u => u.Id == userAgence.UserId))
@@ -94,17 +100,15 @@ namespace GestionFournituresAPI.Controllers
                 // Mettre à jour l'association existante
                 existingAssociation.AgenceId = userAgence.AgenceId;
                 existingAssociation.DateAssociation = DateTime.Now;
-                
                 await _context.SaveChangesAsync();
-                
-                return Ok(existingAssociation);
+                return Ok(_mapper.Map<UserAgenceDto>(existingAssociation));
             }
 
             // Créer une nouvelle association
             _context.UserAgences.Add(userAgence);
             await _context.SaveChangesAsync();
 
-            return CreatedAtAction(nameof(GetUserAgence), new { id = userAgence.Id }, userAgence);
+            return CreatedAtAction(nameof(GetUserAgence), new { id = userAgence.Id }, _mapper.Map<UserAgenceDto>(userAgence));
         }
 
         // DELETE: api/UserAgences/5

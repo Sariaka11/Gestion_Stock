@@ -1,12 +1,9 @@
 using GestionFournituresAPI.Data;
+using GestionFournituresAPI.Dtos;
 using GestionFournituresAPI.Models;
+using GestionFournituresAPI.Services;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Logging;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
 
 namespace GestionFournituresAPI.Controllers
 {
@@ -15,154 +12,112 @@ namespace GestionFournituresAPI.Controllers
     public class ImmobilisationsController : ControllerBase
     {
         private readonly ApplicationDbContext _context;
-        private readonly ILogger<ImmobilisationsController> _logger;
+        private readonly IImmobilisationMappingService _mappingService;
 
-        public ImmobilisationsController(ApplicationDbContext context, ILogger<ImmobilisationsController> logger)
+        public ImmobilisationsController(ApplicationDbContext context, IImmobilisationMappingService mappingService)
         {
             _context = context;
-            _logger = logger;
+            _mappingService = mappingService;
         }
 
         // GET: api/Immobilisations
         [HttpGet]
-        public async Task<ActionResult<IEnumerable<Immobilisation>>> GetImmobilisations()
+        public async Task<ActionResult<IEnumerable<ImmobilisationDto>>> GetImmobilisations()
         {
-            try
+            var immobilisations = await _context.Immobilisations
+                .Include(i => i.Categorie)
+                .Include(i => i.Amortissements)
+                .ToListAsync();
+
+            foreach (var immobilisation in immobilisations)
             {
-                _logger.LogInformation("Récupération de toutes les immobilisations");
-
-                // Utiliser AsNoTracking pour améliorer les performances en lecture seule
-                var immobilisations = await _context.Immobilisations
-                    .Include(i => i.Categorie)
-                    .AsNoTracking()
-                    .ToListAsync();
-
-                _logger.LogInformation($"Nombre d'immobilisations récupérées: {immobilisations.Count}");
-
-                // Calculer les propriétés dérivées pour chaque immobilisation
-                foreach (var immobilisation in immobilisations)
-                {
-                    await CalculerProprietesDerivees(immobilisation);
-                }
-
-                return Ok(immobilisations);
+                await CalculerProprietesDerivees(immobilisation);
             }
-            catch (Exception ex)
-            {
-                // Log l'exception
-                _logger.LogError(ex, "Erreur lors de la récupération des immobilisations");
-                return StatusCode(500, new { message = "Erreur lors de la récupération des immobilisations", error = ex.Message });
-            }
+
+            return Ok(_mappingService.ToDtoList(immobilisations));
         }
 
         // GET: api/Immobilisations/5
         [HttpGet("{id}")]
-        public async Task<ActionResult<Immobilisation>> GetImmobilisation(int id)
+        public async Task<ActionResult<ImmobilisationDto>> GetImmobilisation(int id)
         {
-            try
+            var immobilisation = await _context.Immobilisations
+                .Include(i => i.Categorie)
+                .Include(i => i.Amortissements)
+                .FirstOrDefaultAsync(i => i.IdBien == id);
+
+            if (immobilisation == null)
             {
-                _logger.LogInformation($"Récupération de l'immobilisation avec ID: {id}");
-
-                var immobilisation = await _context.Immobilisations
-                    .Include(i => i.Categorie)
-                    .Include(i => i.Amortissements)
-                    .AsNoTracking()
-                    .FirstOrDefaultAsync(i => i.IdBien == id);
-
-                if (immobilisation == null)
-                {
-                    _logger.LogWarning($"Immobilisation avec ID {id} non trouvée");
-                    return NotFound(new { message = $"Immobilisation avec ID {id} non trouvée" });
-                }
-
-                // Calculer les propriétés dérivées
-                await CalculerProprietesDerivees(immobilisation);
-
-                return Ok(immobilisation);
+                return NotFound();
             }
-            catch (Exception ex)
-            {
-                // Log l'exception
-                _logger.LogError(ex, $"Erreur lors de la récupération de l'immobilisation {id}");
-                return StatusCode(500, new { message = $"Erreur lors de la récupération de l'immobilisation {id}", error = ex.Message });
-            }
+
+            await CalculerProprietesDerivees(immobilisation);
+            return Ok(_mappingService.ToDto(immobilisation));
         }
 
         // POST: api/Immobilisations
         [HttpPost]
-        public async Task<ActionResult<Immobilisation>> PostImmobilisation(Immobilisation immobilisation)
+        public async Task<ActionResult<ImmobilisationDto>> PostImmobilisation(ImmobilisationCreateDto createDto)
         {
-            try
+            if (createDto == null)
             {
-                _logger.LogInformation("Création d'une nouvelle immobilisation");
-                _logger.LogDebug($"Données reçues: {System.Text.Json.JsonSerializer.Serialize(immobilisation)}");
-
-                _context.Immobilisations.Add(immobilisation);
-                await _context.SaveChangesAsync();
-
-                _logger.LogInformation($"Immobilisation créée avec ID: {immobilisation.IdBien}");
-
-                // Récupérer l'immobilisation avec sa catégorie
-                var createdImmobilisation = await _context.Immobilisations
-                    .Include(i => i.Categorie)
-                    .FirstOrDefaultAsync(i => i.IdBien == immobilisation.IdBien);
-
-                return CreatedAtAction(nameof(GetImmobilisation), new { id = immobilisation.IdBien }, createdImmobilisation);
+                return BadRequest("Données d'entrée invalides.");
             }
-            catch (Exception ex)
+
+            // Vérifier si la catégorie existe
+            if (!await _context.Categories.AnyAsync(c => c.IdCategorie == createDto.IdCategorie))
             {
-                // Log l'exception
-                _logger.LogError(ex, "Erreur lors de la création de l'immobilisation");
-                return StatusCode(500, new { message = "Erreur lors de la création de l'immobilisation", error = ex.Message });
+                return BadRequest("La catégorie spécifiée n'existe pas.");
             }
+
+            var immobilisation = _mappingService.ToEntity(createDto);
+            if (immobilisation == null)
+            {
+                return BadRequest("Erreur lors du mappage des données.");
+            }
+
+            await CalculerProprietesDerivees(immobilisation);
+            _context.Immobilisations.Add(immobilisation);
+            await _context.SaveChangesAsync();
+
+            var immobilisationDto = _mappingService.ToDto(immobilisation);
+            return CreatedAtAction(nameof(GetImmobilisation), new { id = immobilisation.IdBien }, immobilisationDto);
         }
 
         // PUT: api/Immobilisations/5
         [HttpPut("{id}")]
-        public async Task<IActionResult> PutImmobilisation(int id, Immobilisation immobilisation)
+        public async Task<IActionResult> PutImmobilisation(int id, ImmobilisationUpdateDto updateDto)
         {
-            if (id != immobilisation.IdBien)
+            if (updateDto == null)
             {
-                _logger.LogWarning("L'ID dans l'URL ne correspond pas à l'ID dans les données");
-                return BadRequest(new { message = "L'ID dans l'URL ne correspond pas à l'ID dans les données" });
+                return BadRequest("Données d'entrée invalides.");
             }
+
+            var immobilisation = await _context.Immobilisations
+                .FirstOrDefaultAsync(i => i.IdBien == id);
+
+            if (immobilisation == null)
+            {
+                return NotFound();
+            }
+
+            _mappingService.UpdateEntity(immobilisation, updateDto);
+            await CalculerProprietesDerivees(immobilisation);
 
             try
             {
-                _logger.LogInformation($"Mise à jour de l'immobilisation avec ID: {id}");
-                _logger.LogDebug($"Données reçues: {System.Text.Json.JsonSerializer.Serialize(immobilisation)}");
-
-                _context.Entry(immobilisation).State = EntityState.Modified;
                 await _context.SaveChangesAsync();
-
-                _logger.LogInformation($"Immobilisation avec ID {id} mise à jour avec succès");
-
-                // Récupérer l'immobilisation mise à jour avec sa catégorie
-                var updatedImmobilisation = await _context.Immobilisations
-                    .Include(i => i.Categorie)
-                    .FirstOrDefaultAsync(i => i.IdBien == id);
-
-                return Ok(updatedImmobilisation);
             }
-            catch (DbUpdateConcurrencyException ex)
+            catch (DbUpdateConcurrencyException)
             {
                 if (!ImmobilisationExists(id))
                 {
-                    _logger.LogWarning($"Immobilisation avec ID {id} non trouvée lors de la mise à jour");
-                    return NotFound(new { message = $"Immobilisation avec ID {id} non trouvée" });
+                    return NotFound();
                 }
-                else
-                {
-                    _logger.LogError(ex, $"Erreur de concurrence lors de la mise à jour de l'immobilisation {id}");
-                    throw;
-                }
+                throw;
             }
-            catch (Exception ex)
-            {
-                // Log l'exception
-                _logger.LogError(ex, $"Erreur lors de la mise à jour de l'immobilisation {id}");
-                return StatusCode(500, new { message = $"Erreur lors de la mise à jour de l'immobilisation {id}", error = ex.Message });
-            }
+
+            return NoContent();
         }
 
         // DELETE: api/Immobilisations/5
@@ -171,84 +126,91 @@ namespace GestionFournituresAPI.Controllers
         {
             try
             {
-                _logger.LogInformation($"Suppression de l'immobilisation avec ID: {id}");
+                var Immobilisation = await _context.Immobilisations
+                    .FirstOrDefaultAsync(i => i.IdBien == id);
 
-                var immobilisation = await _context.Immobilisations.FindAsync(id);
-                if (immobilisation == null)
+                if (Immobilisation == null)
                 {
-                    _logger.LogWarning($"Immobilisation avec ID {id} non trouvée lors de la suppression");
-                    return NotFound(new { message = $"Immobilisation avec ID {id} non trouvée" });
+                    Console.WriteLine($"Immobilisation non trouvé pour IdBien: {id}");
+                    return NotFound("Immobilisation non trouvé.");
                 }
 
-                _context.Immobilisations.Remove(immobilisation);
+                // Vérifier les affectations associées dans BIEN_AGENCE
+                var affectations = await _context.BienAgences
+                    .Where(ba => ba.IdBien == id)
+                    .ToListAsync();
+
+                if (affectations.Any())
+                {
+                    // Supprimer les affectations associées
+                    Console.WriteLine($"Suppression de {affectations.Count} affectations pour IdBien: {id}");
+                    _context.BienAgences.RemoveRange(affectations);
+                }
+
+                // Supprimer l'Immobilisation
+                _context.Immobilisations.Remove(Immobilisation);
                 await _context.SaveChangesAsync();
 
-                _logger.LogInformation($"Immobilisation avec ID {id} supprimée avec succès");
+                Console.WriteLine($"Immobilisation supprimé avec succès: IdBien={id}");
                 return NoContent();
             }
             catch (Exception ex)
             {
-                // Log l'exception
-                _logger.LogError(ex, $"Erreur lors de la suppression de l'immobilisation {id}");
-                return StatusCode(500, new { message = $"Erreur lors de la suppression de l'immobilisation {id}", error = ex.Message });
+                Console.WriteLine($"Erreur dans DeleteImmobilisation: {ex.Message}\n{ex.StackTrace}");
+                return StatusCode(500, $"Erreur lors de la suppression: {ex.Message}");
+            }
+        }
+    
+
+private async Task CalculerProprietesDerivees(Immobilisation immobilisation)
+        {
+            if (immobilisation == null)
+            {
+                return;
+            }
+
+            // Calculer les propriétés dérivées
+            var amortissements = await _context.Amortissements
+                .Where(a => a.IdBien == immobilisation.IdBien)
+                .OrderBy(a => a.Annee)
+                .ToListAsync();
+
+            immobilisation.AmortissementCumule = amortissements.Sum(a => a.Montant);
+            immobilisation.ValeurNetteComptable = immobilisation.ValeurAcquisition - immobilisation.AmortissementCumule;
+
+            var categorie = await _context.Categories
+                .FirstOrDefaultAsync(c => c.IdCategorie == immobilisation.IdCategorie);
+
+            if (categorie != null && immobilisation.DateAcquisition.HasValue)
+            {
+                var anneeAcquisition = immobilisation.DateAcquisition.Value.Year;
+                var anneeActuelle = DateTime.Now.Year;
+                var dureeEcoulee = anneeActuelle - anneeAcquisition;
+                immobilisation.DureeRestante = Math.Max(0, categorie.DureeAmortissement - dureeEcoulee);
+
+                if (immobilisation.DureeRestante == 0)
+                {
+                    immobilisation.DateFinAmortissement = immobilisation.DateAcquisition.Value.AddYears(categorie.DureeAmortissement);
+                    immobilisation.Statut = "amorti";
+                }
+                else
+                {
+                    immobilisation.DateFinAmortissement = immobilisation.DateAcquisition.Value.AddYears(categorie.DureeAmortissement);
+                    immobilisation.Statut = "actif";
+                }
+            }
+            else
+            {
+                // Gérer le cas où DateAcquisition est null ou catégorie introuvable
+                immobilisation.DureeRestante = 0;
+                immobilisation.DateFinAmortissement = null;
+                immobilisation.Statut = "inconnu";
             }
         }
 
         private bool ImmobilisationExists(int id)
         {
             return _context.Immobilisations.Any(e => e.IdBien == id);
-        }
-
-        // Méthode pour calculer les propriétés dérivées d'une immobilisation
-        private async Task CalculerProprietesDerivees(Immobilisation immobilisation)
-        {
-            try
-            {
-                // Charger les amortissements si ce n'est pas déjà fait
-                if (immobilisation.Amortissements == null)
-                {
-                    immobilisation.Amortissements = await _context.Amortissements
-                        .Where(a => a.IdBien == immobilisation.IdBien)
-                        .OrderBy(a => a.Annee)
-                        .ToListAsync();
-                }
-
-                // Calculer l'amortissement cumulé
-                immobilisation.AmortissementCumule = immobilisation.Amortissements?.Sum(a => a.Montant) ?? 0;
-
-                // Calculer la valeur nette comptable
-                immobilisation.ValeurNetteComptable = immobilisation.ValeurAcquisition - immobilisation.AmortissementCumule;
-
-                // Calculer la durée restante et la date de fin d'amortissement
-                if (immobilisation.Categorie != null && immobilisation.DateAcquisition.HasValue)
-                {
-                    int dureeAmortissement = immobilisation.Categorie.DureeAmortissement;
-                    DateTime dateAcquisition = immobilisation.DateAcquisition.Value;
-                    DateTime dateFin = dateAcquisition.AddYears(dureeAmortissement);
-
-                    immobilisation.DateFinAmortissement = dateFin;
-
-                    // Calculer la durée restante en années
-                    int anneesEcoulees = DateTime.Now.Year - dateAcquisition.Year;
-                    if (DateTime.Now.Month < dateAcquisition.Month ||
-                        (DateTime.Now.Month == dateAcquisition.Month && DateTime.Now.Day < dateAcquisition.Day))
-                    {
-                        anneesEcoulees--;
-                    }
-
-                    immobilisation.DureeRestante = Math.Max(0, dureeAmortissement - anneesEcoulees);
-                }
-                else
-                {
-                    immobilisation.DureeRestante = 0;
-                    immobilisation.DateFinAmortissement = null;
-                }
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, $"Erreur lors du calcul des propriétés dérivées pour l'immobilisation {immobilisation.IdBien}");
-                // Ne pas propager l'exception pour éviter de bloquer la récupération des données
-            }
         }
     }
 }

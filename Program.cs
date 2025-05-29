@@ -1,14 +1,15 @@
 ﻿using Microsoft.AspNetCore.Builder;
-using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using GestionFournituresAPI.Data;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Configuration;
-using Microsoft.AspNetCore.Http;
 using System.Text.Json.Serialization;
 using GestionFournituresAPI.Services;
+using AutoMapper;
+using GestionFournituresAPI.Mappings;
+using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.Configuration;
 
 namespace GestionFournituresAPI
 {
@@ -18,7 +19,7 @@ namespace GestionFournituresAPI
         {
             var builder = WebApplication.CreateBuilder(args);
 
-            // ✅ Configuration CORS
+            // Configuration CORS
             builder.Services.AddCors(options =>
             {
                 options.AddDefaultPolicy(policy =>
@@ -29,40 +30,44 @@ namespace GestionFournituresAPI
                 });
             });
 
-            // ✅ Configuration des contrôleurs + JSON
+            // Configuration des contrôleurs + JSON
             builder.Services.AddControllers()
                 .AddJsonOptions(options =>
                 {
-                    options.JsonSerializerOptions.ReferenceHandler = ReferenceHandler.Preserve;
                     options.JsonSerializerOptions.DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull;
+                    options.JsonSerializerOptions.ReferenceHandler = ReferenceHandler.IgnoreCycles; // Changé pour ignorer les cycles
                 });
 
-            // ✅ Connexion à la base de données Oracle
+            // Connexion à la base de données Oracle
             builder.Services.AddDbContext<ApplicationDbContext>(options =>
                 options.UseOracle(
                     builder.Configuration.GetConnectionString("DefaultConnection")
                 ));
 
-            // ✅ Enregistrement des services
+            // Enregistrement des services
             builder.Services.AddScoped<AmortissementService>();
+            builder.Services.AddScoped<IImmobilisationMappingService, ImmobilisationMappingService>();
 
-            // ✅ Swagger
+            // Configuration d'AutoMapper
+            builder.Services.AddAutoMapper(typeof(MappingProfile));
+
+            // Swagger
             builder.Services.AddEndpointsApiExplorer();
             builder.Services.AddSwaggerGen();
 
-            // ✅ Authentification avec cookies
+            // Authentification avec cookies
             builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
                 .AddCookie(options =>
                 {
                     options.Cookie.HttpOnly = true;
                     options.Cookie.SameSite = SameSiteMode.Strict;
-                    options.LoginPath = "/login"; // facultatif
-                    options.AccessDeniedPath = "/access-denied"; // facultatif
+                    options.LoginPath = "/login";
+                    options.AccessDeniedPath = "/access-denied";
                 });
 
             var app = builder.Build();
 
-            // ✅ Middleware
+            // Middleware
             if (app.Environment.IsDevelopment())
             {
                 app.UseSwagger();
@@ -71,13 +76,10 @@ namespace GestionFournituresAPI
             }
 
             app.UseCors();
-
             app.UseHttpsRedirection();
             app.UseRouting();
-
-            app.UseAuthentication(); // doit venir avant Authorization
+            app.UseAuthentication();
             app.UseAuthorization();
-
             app.MapControllers();
 
             app.Run();

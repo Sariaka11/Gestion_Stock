@@ -1,7 +1,8 @@
 using GestionFournituresAPI.Data;
-using GestionFournituresAPI.Models;
+using GestionFournituresAPI.Dtos;
+using GestionFournituresAPI.Services;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
+using AutoMapper;
 
 namespace GestionFournituresAPI.Controllers
 {
@@ -9,80 +10,64 @@ namespace GestionFournituresAPI.Controllers
     [ApiController]
     public class AmortissementsController : ControllerBase
     {
-        private readonly ApplicationDbContext _context;
+        private readonly AmortissementService _amortissementService;
+        private readonly IMapper _mapper;
 
-        public AmortissementsController(ApplicationDbContext context)
+        public AmortissementsController(AmortissementService amortissementService, IMapper mapper)
         {
-            _context = context;
+            _amortissementService = amortissementService;
+            _mapper = mapper;
         }
 
         // GET: api/Amortissements
         [HttpGet]
-        public async Task<ActionResult<IEnumerable<Amortissement>>> GetAmortissements()
+        public async Task<ActionResult<IEnumerable<AmortissementDto>>> GetAmortissements()
         {
-            return await _context.Amortissements
-                .Include(a => a.Immobilisation)
-                .ToListAsync();
+            var amortissements = await _amortissementService.GetAllAsync();
+            return _mapper.Map<List<AmortissementDto>>(amortissements);
         }
 
         // GET: api/Amortissements/5
         [HttpGet("{id}")]
-        public async Task<ActionResult<Amortissement>> GetAmortissement(int id)
+        public async Task<ActionResult<AmortissementDto>> GetAmortissement(int id)
         {
-            var amortissement = await _context.Amortissements
-                .Include(a => a.Immobilisation)
-                .FirstOrDefaultAsync(a => a.IdAmortissement == id);
-
+            var amortissement = await _amortissementService.GetByIdAsync(id);
             if (amortissement == null)
             {
                 return NotFound();
             }
-
-            return amortissement;
+            return _mapper.Map<AmortissementDto>(amortissement);
         }
 
         // GET: api/Amortissements/Bien/5
         [HttpGet("Bien/{idBien}")]
-        public async Task<ActionResult<IEnumerable<Amortissement>>> GetAmortissementsByBien(int idBien)
+        public async Task<ActionResult<IEnumerable<AmortissementDto>>> GetAmortissementsByBien(int idBien)
         {
-            if (!await _context.Immobilisations.AnyAsync(i => i.IdBien == idBien))
+            var amortissements = await _amortissementService.GetByBienAsync(idBien);
+            if (amortissements == null || !amortissements.Any())
             {
                 return NotFound("Le bien spécifié n'existe pas.");
             }
-
-            var amortissements = await _context.Amortissements
-                .Where(a => a.IdBien == idBien)
-                .OrderBy(a => a.Annee)
-                .ToListAsync();
-
-            return amortissements;
+            return _mapper.Map<List<AmortissementDto>>(amortissements);
         }
 
         // GET: api/Amortissements/Annee/2023
         [HttpGet("Annee/{annee}")]
-        public async Task<ActionResult<IEnumerable<Amortissement>>> GetAmortissementsByAnnee(int annee)
+        public async Task<ActionResult<IEnumerable<AmortissementDto>>> GetAmortissementsByAnnee(int annee)
         {
-            var amortissements = await _context.Amortissements
-                .Include(a => a.Immobilisation)
-                .Where(a => a.Annee == annee)
-                .ToListAsync();
-
-            return amortissements;
+            var amortissements = await _amortissementService.GetByAnneeAsync(annee);
+            return _mapper.Map<List<AmortissementDto>>(amortissements);
         }
 
         // DELETE: api/Amortissements/5
         [HttpDelete("{id}")]
         public async Task<IActionResult> DeleteAmortissement(int id)
         {
-            var amortissement = await _context.Amortissements.FindAsync(id);
-            if (amortissement == null)
+            var success = await _amortissementService.DeleteAsync(id);
+            if (!success)
             {
                 return NotFound();
             }
-
-            _context.Amortissements.Remove(amortissement);
-            await _context.SaveChangesAsync();
-
             return NoContent();
         }
     }

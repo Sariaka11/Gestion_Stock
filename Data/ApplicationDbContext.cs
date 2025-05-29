@@ -79,13 +79,15 @@ namespace GestionFournituresAPI.Data
                 .WithMany(f => f.UserFournitures)
                 .HasForeignKey(uf => uf.FournitureId);
 
-            // Configuration des nouvelles relations pour la gestion de l'immobilier
-
-            // Relation entre Immobilisation et Categorie
             modelBuilder.Entity<Immobilisation>()
-                .HasOne(i => i.Categorie)
-                .WithMany(c => c.Immobilisations)
-                .HasForeignKey(i => i.IdCategorie);
+                  .HasMany(i => i.Amortissements)
+                  .WithOne(a => a.Immobilisation)
+                  .HasForeignKey(a => a.IdBien);
+
+            //modelBuilder.Entity<Immobilisation>()
+            //    .HasOne(i => i.Categorie)
+            //    .WithMany()
+            //    .HasForeignKey(i => i.IdCategorie);
 
             // Relation entre Amortissement et Immobilisation
             modelBuilder.Entity<Amortissement>()

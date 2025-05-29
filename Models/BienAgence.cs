@@ -15,6 +15,9 @@ namespace GestionFournituresAPI.Models
         [Column("DATE_AFFECTATION")]
         public DateTime DateAffectation { get; set; }
 
+        [Column("QUANTITE")]
+        public int? Quantite { get; set; }
+
         // Navigation properties
         [ForeignKey("IdBien")]
         public virtual Immobilisation? Immobilisation { get; set; }
