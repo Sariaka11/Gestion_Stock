@@ -8,11 +8,13 @@ namespace GestionFournituresAPI.Dtos
         public string NomBien { get; set; } = string.Empty;
         public string? CodeBarre { get; set; }
         public decimal ValeurAcquisition { get; set; }
-        public decimal TauxAmortissement { get; set; }
         public int? Quantite { get; set; }
         public string? Statut { get; set; }
         public int? IdCategorie { get; set; }
         public DateTime? DateAcquisition { get; set; }
+
+        public decimal ValeurResiduelle { get; set; }
+        public DateTime? DateCalcul { get; set; }
 
         // Propriétés calculées
         public decimal ValeurNetteComptable { get; set; }
@@ -38,11 +40,6 @@ namespace GestionFournituresAPI.Dtos
         [Range(0, double.MaxValue, ErrorMessage = "La valeur d'acquisition doit être positive")]
         public decimal ValeurAcquisition { get; set; }
 
-        [Required(ErrorMessage = "Le taux d'amortissement est obligatoire")]
-        [Range(0, 100, ErrorMessage = "Le taux d'amortissement doit être entre 0 et 100")]
-        public decimal TauxAmortissement { get; set; }
-
-        [Range(1, int.MaxValue, ErrorMessage = "La quantité doit être positive")]
         public int? Quantite { get; set; }
 
         [StringLength(20, ErrorMessage = "Le statut ne peut pas dépasser 20 caractères")]
@@ -66,11 +63,6 @@ namespace GestionFournituresAPI.Dtos
         [Range(0, double.MaxValue, ErrorMessage = "La valeur d'acquisition doit être positive")]
         public decimal ValeurAcquisition { get; set; }
 
-        [Required(ErrorMessage = "Le taux d'amortissement est obligatoire")]
-        [Range(0, 100, ErrorMessage = "Le taux d'amortissement doit être entre 0 et 100")]
-        public decimal TauxAmortissement { get; set; }
-
-        [Range(1, int.MaxValue, ErrorMessage = "La quantité doit être positive")]
         public int? Quantite { get; set; }
 
         [StringLength(20, ErrorMessage = "Le statut ne peut pas dépasser 20 caractères")]

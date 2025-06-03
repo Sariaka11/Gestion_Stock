@@ -13,7 +13,7 @@ namespace GestionFournituresAPI.Models
         [Required]
         [Column("NOM_BIEN")]
         [StringLength(100)]
-        public string NomBien { get; set; } = string.Empty; // Initialisation pour éviter l'avertissement
+        public string NomBien { get; set; } = string.Empty;
 
         [Column("CODE_BARRE")]
         [StringLength(20)]
@@ -23,11 +23,6 @@ namespace GestionFournituresAPI.Models
         [Column("VALEUR_ACQUISITION")]
         [Range(0, double.MaxValue)]
         public decimal ValeurAcquisition { get; set; }
-
-        [Required]
-        [Column("TAUX_AMORTISSEMENT")]
-        [Range(0, 100)]
-        public decimal TauxAmortissement { get; set; }
 
         [Column("QUANTITE")]
         public int? Quantite { get; set; }
@@ -50,7 +45,7 @@ namespace GestionFournituresAPI.Models
 
         public virtual ICollection<BienAgence>? BienAgences { get; set; }
 
-        // Propriétés calculées (non stockées en base de données)
+        // Propriétés calculées
         [NotMapped]
         public decimal ValeurNetteComptable { get; set; }
 

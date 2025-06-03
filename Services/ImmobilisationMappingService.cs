@@ -25,7 +25,6 @@ namespace GestionFournituresAPI.Services
                 NomBien = immobilisation.NomBien,
                 CodeBarre = immobilisation.CodeBarre,
                 ValeurAcquisition = immobilisation.ValeurAcquisition,
-                TauxAmortissement = immobilisation.TauxAmortissement,
                 Quantite = immobilisation.Quantite,
                 Statut = immobilisation.Statut,
                 IdCategorie = immobilisation.IdCategorie,
@@ -46,7 +45,8 @@ namespace GestionFournituresAPI.Services
                     IdBien = a.IdBien,
                     Annee = a.Annee,
                     Montant = a.Montant,
-                    ValeurResiduelle = a.ValeurResiduelle // Ajouté
+                    ValeurResiduelle = a.ValeurResiduelle,
+                    DateCalcul = a.DateCalcul
                 }).ToList()
             };
         }
@@ -61,7 +61,6 @@ namespace GestionFournituresAPI.Services
                 NomBien = createDto.NomBien,
                 CodeBarre = createDto.CodeBarre,
                 ValeurAcquisition = createDto.ValeurAcquisition,
-                TauxAmortissement = createDto.TauxAmortissement,
                 Quantite = createDto.Quantite,
                 Statut = createDto.Statut,
                 IdCategorie = createDto.IdCategorie,
@@ -74,14 +73,19 @@ namespace GestionFournituresAPI.Services
             if (entity == null || updateDto == null)
                 return;
 
-            entity.NomBien = updateDto.NomBien;
-            entity.CodeBarre = updateDto.CodeBarre;
-            entity.ValeurAcquisition = updateDto.ValeurAcquisition;
-            entity.TauxAmortissement = updateDto.TauxAmortissement;
-            entity.Quantite = updateDto.Quantite;
-            entity.Statut = updateDto.Statut;
-            entity.IdCategorie = updateDto.IdCategorie;
-            entity.DateAcquisition = updateDto.DateAcquisition;
+            if (updateDto.NomBien != null)
+                entity.NomBien = updateDto.NomBien;
+            if (updateDto.CodeBarre != null)
+                entity.CodeBarre = updateDto.CodeBarre;
+            entity.ValeurAcquisition = updateDto.ValeurAcquisition; // Plus besoin de .HasValue car non nullable
+            if (updateDto.Quantite.HasValue)
+                entity.Quantite = updateDto.Quantite;
+            if (updateDto.Statut != null)
+                entity.Statut = updateDto.Statut;
+            if (updateDto.IdCategorie.HasValue)
+                entity.IdCategorie = updateDto.IdCategorie;
+            if (updateDto.DateAcquisition.HasValue)
+                entity.DateAcquisition = updateDto.DateAcquisition;
         }
 
         public List<ImmobilisationDto> ToDtoList(List<Immobilisation>? immobilisations)
