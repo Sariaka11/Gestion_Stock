@@ -17,6 +17,7 @@ namespace GestionFournituresAPI.Data
         public DbSet<AgenceFourniture> AgenceFournitures { get; set; } = null!;
         public DbSet<UserAgence> UserAgences { get; set; } = null!;
         public DbSet<UserFourniture> UserFournitures { get; set; } = null!;
+        public DbSet<EntreeFourniture> EntreeFournitures { get; set; }
 
         // Nouvelles tables pour la gestion de l'immobilier
         public DbSet<Categorie> Categories { get; set; } = null!;

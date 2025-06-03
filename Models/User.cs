@@ -13,30 +13,30 @@ namespace GestionFournituresAPI.Models
         [Required]
         [Column("NOM")]
         [StringLength(100)]
-        public string Nom { get; set; } = string.Empty;
+        public string Nom { get; set; }
 
         [Required]
         [Column("PRENOM")]
         [StringLength(100)]
-        public string Prenom { get; set; } = string.Empty;
+        public string Prenom { get; set; }
 
         [Required]
         [Column("EMAIL")]
         [StringLength(100)]
-        public string Email { get; set; } = string.Empty;
+        public string Email { get; set; }
 
         [Required]
         [Column("MOT_DE_PASSE")]
         [StringLength(2000)]
-        public string MotDePasse { get; set; } = string.Empty;
+        public string MotDePasse { get; set; }
 
         [Required]
         [Column("FONCTION")]
-        [StringLength(100)]
-        public string Fonction { get; set; } = string.Empty;
-
-        // Ajout des propriétés de navigation
-        public virtual ICollection<UserAgence> UserAgences { get; set; } = new List<UserAgence>();
+        [StringLength(20)]
+        public string Fonction { get; set; }
         public virtual ICollection<UserFourniture> UserFournitures { get; set; } = new List<UserFourniture>();
+
+        // Relations avec UserAgence
+        public virtual ICollection<UserAgence> UserAgences { get; set; } = new List<UserAgence>();     // public virtual Agence Agence { get; set; }
     }
 }

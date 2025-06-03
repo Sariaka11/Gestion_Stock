@@ -20,11 +20,14 @@ namespace GestionFournituresAPI.Controllers
         [HttpGet]
         public async Task<ActionResult<IEnumerable<Fourniture>>> GetFournitures()
         {
-            var fournitures = await _context.Fournitures.ToListAsync();
+            var fournitures = await _context.Fournitures
+                .Include(f => f.EntreesFournitures)
+                .Include(f => f.AgenceFournitures)
+                .ToListAsync();
 
-            // Calculer le CMUP pour chaque fourniture
             foreach (var fourniture in fournitures)
             {
+                CalculerValeurs(fourniture);
                 fourniture.CMUP = CalculerCMUP(fourniture.Id);
             }
 
@@ -35,14 +38,17 @@ namespace GestionFournituresAPI.Controllers
         [HttpGet("{id}")]
         public async Task<ActionResult<Fourniture>> GetFourniture(int id)
         {
-            var fourniture = await _context.Fournitures.FindAsync(id);
+            var fourniture = await _context.Fournitures
+                .Include(f => f.EntreesFournitures)
+                .Include(f => f.AgenceFournitures)
+                .FirstOrDefaultAsync(f => f.Id == id);
 
             if (fourniture == null)
             {
                 return NotFound();
             }
 
-            // Calculer le CMUP pour cette fourniture
+            CalculerValeurs(fourniture);
             fourniture.CMUP = CalculerCMUP(id);
 
             return fourniture;
@@ -52,36 +58,31 @@ namespace GestionFournituresAPI.Controllers
         [HttpPost]
         public async Task<ActionResult<Fourniture>> PostFourniture(Fourniture fourniture)
         {
-            // Vérifier si une fourniture avec le même nom existe déjà
             var existingFourniture = await _context.Fournitures
-                .FirstOrDefaultAsync(f => f.Nom == fourniture.Nom);
+                .Include(f => f.EntreesFournitures)
+                .FirstOrDefaultAsync(f => f.Nom == fourniture.Nom && f.Categorie == fourniture.Categorie);
 
             if (existingFourniture != null)
             {
-                // Mettre à jour la fourniture existante
-                existingFourniture.PrixUnitaire = fourniture.PrixUnitaire;
-                existingFourniture.Categorie = fourniture.Categorie;
+                var nouvelleEntree = new EntreeFourniture
+                {
+                    FournitureId = existingFourniture.Id,
+                    QuantiteEntree = fourniture.Quantite,
+                    DateEntree = DateTime.Now,
+                    PrixUnitaire = fourniture.PrixUnitaire,
+                    Montant = fourniture.PrixUnitaire * fourniture.Quantite
+                };
 
-                // Ajouter la nouvelle quantité à la quantité restante existante
+                existingFourniture.EntreesFournitures.Add(nouvelleEntree);
+                existingFourniture.PrixUnitaire = fourniture.PrixUnitaire;
                 existingFourniture.QuantiteRestante += fourniture.Quantite;
 
-                // Mettre à jour la quantité totale
-                existingFourniture.Quantite = fourniture.Quantite;
-
-                // Recalculer les valeurs
-                existingFourniture.Montant = existingFourniture.PrixUnitaire * existingFourniture.Quantite;
-                existingFourniture.PrixTotal = existingFourniture.QuantiteRestante * existingFourniture.PrixUnitaire;
-
-                // Mettre à jour la date
-                existingFourniture.Date = DateTime.Now;
+                CalculerValeurs(existingFourniture);
 
                 try
                 {
                     await _context.SaveChangesAsync();
-
-                    // Calculer le CMUP pour cette fourniture
                     existingFourniture.CMUP = CalculerCMUP(existingFourniture.Id);
-
                     return Ok(existingFourniture);
                 }
                 catch (DbUpdateConcurrencyException)
@@ -98,16 +99,22 @@ namespace GestionFournituresAPI.Controllers
             }
             else
             {
-                // C'est une nouvelle fourniture, calculer les valeurs
-                fourniture.Date = DateTime.Now;
-                CalculerValeurs(fourniture, true);
+                fourniture.QuantiteRestante = fourniture.Quantite;
+                var nouvelleEntree = new EntreeFourniture
+                {
+                    QuantiteEntree = fourniture.Quantite,
+                    DateEntree = DateTime.Now,
+                    PrixUnitaire = fourniture.PrixUnitaire,
+                    Montant = fourniture.PrixUnitaire * fourniture.Quantite
+                };
+
+                fourniture.EntreesFournitures = new List<EntreeFourniture> { nouvelleEntree };
+                CalculerValeurs(fourniture);
 
                 _context.Fournitures.Add(fourniture);
                 await _context.SaveChangesAsync();
 
-                // Calculer le CMUP pour cette fourniture
                 fourniture.CMUP = CalculerCMUP(fourniture.Id);
-
                 return CreatedAtAction(nameof(GetFourniture), new { id = fourniture.Id }, fourniture);
             }
         }
@@ -121,21 +128,30 @@ namespace GestionFournituresAPI.Controllers
                 return BadRequest();
             }
 
-            // Récupérer la fourniture existante pour les calculs
-            var existingFourniture = await _context.Fournitures.FindAsync(id);
+            var existingFourniture = await _context.Fournitures
+                .Include(f => f.EntreesFournitures)
+                .FirstOrDefaultAsync(f => f.Id == id);
+
             if (existingFourniture == null)
             {
                 return NotFound();
             }
 
-            // Mettre à jour la quantité restante en fonction de la nouvelle quantité
-            fourniture.QuantiteRestante = existingFourniture.QuantiteRestante + (fourniture.Quantite - existingFourniture.Quantite);
+            var nouvelleEntree = new EntreeFourniture
+            {
+                FournitureId = existingFourniture.Id,
+                QuantiteEntree = fourniture.Quantite,
+                DateEntree = DateTime.Now,
+                PrixUnitaire = fourniture.PrixUnitaire,
+                Montant = fourniture.PrixUnitaire * fourniture.Quantite
+            };
 
-            // Recalculer les valeurs
-            CalculerValeurs(fourniture, false);
+            existingFourniture.EntreesFournitures.Add(nouvelleEntree);
+            existingFourniture.PrixUnitaire = fourniture.PrixUnitaire;
+            existingFourniture.QuantiteRestante += fourniture.Quantite - existingFourniture.Quantite;
+            CalculerValeurs(existingFourniture);
 
-            _context.Entry(existingFourniture).State = EntityState.Detached;
-            _context.Entry(fourniture).State = EntityState.Modified;
+            _context.Entry(existingFourniture).State = EntityState.Modified;
 
             try
             {
@@ -160,18 +176,18 @@ namespace GestionFournituresAPI.Controllers
         [HttpDelete("{id}")]
         public async Task<IActionResult> DeleteFourniture(int id)
         {
-            var fourniture = await _context.Fournitures.FindAsync(id);
+            var fourniture = await _context.Fournitures
+                .Include(f => f.EntreesFournitures)
+                .Include(f => f.AgenceFournitures)
+                .FirstOrDefaultAsync(f => f.Id == id);
+
             if (fourniture == null)
             {
                 return NotFound();
             }
 
-            // Supprimer également les associations avec les agences
-            var associations = await _context.AgenceFournitures
-                .Where(af => af.FournitureId == id)
-                .ToListAsync();
-
-            _context.AgenceFournitures.RemoveRange(associations);
+            _context.EntreeFournitures.RemoveRange(fourniture.EntreesFournitures);
+            _context.AgenceFournitures.RemoveRange(fourniture.AgenceFournitures);
             _context.Fournitures.Remove(fourniture);
             await _context.SaveChangesAsync();
 
@@ -190,44 +206,76 @@ namespace GestionFournituresAPI.Controllers
             return CalculerCMUP(id);
         }
 
-        // Méthode pour calculer le CMUP (Coût Moyen Unitaire Pondéré)
-        private decimal CalculerCMUP(int fournitureId)
+        // Nouveau endpoint : POST api/Fournitures/{id}/Entrees
+        [HttpPost("{id}/Entrees")]
+        public async Task<ActionResult<Fourniture>> PostEntreeFourniture(int id, EntreeFourniture entreeFourniture)
         {
-            // Récupérer toutes les fournitures du même type (même nom)
-            var fourniture = _context.Fournitures.Find(fournitureId);
+            // Vérifier si la fourniture existe
+            var fourniture = await _context.Fournitures
+                .Include(f => f.EntreesFournitures)
+                .FirstOrDefaultAsync(f => f.Id == id);
+
             if (fourniture == null)
             {
-                return 0;
+                return NotFound();
             }
 
-            var fournituresMemeType = _context.Fournitures
-                .Where(f => f.Nom == fourniture.Nom && f.Categorie == fourniture.Categorie)
-                .ToList();
-
-            if (!fournituresMemeType.Any() || fournituresMemeType.Sum(f => f.QuantiteRestante) == 0)
+            // Vérifier si l'ID de la fourniture correspond
+            if (entreeFourniture.FournitureId != id)
             {
-                return 0;
+                return BadRequest("L'ID de la fourniture dans EntreeFourniture ne correspond pas à l'ID fourni.");
             }
 
-            // Calculer le CMUP: Somme(Quantité * Prix Unitaire) / Somme(Quantité)
-            decimal sommeProduits = fournituresMemeType.Sum(f => f.QuantiteRestante * f.PrixUnitaire);
-            int sommeQuantites = fournituresMemeType.Sum(f => f.QuantiteRestante);
+            // Ajouter l'entrée
+            entreeFourniture.Montant = entreeFourniture.QuantiteEntree * entreeFourniture.PrixUnitaire;
+            fourniture.EntreesFournitures.Add(entreeFourniture);
+            fourniture.PrixUnitaire = entreeFourniture.PrixUnitaire;
+            fourniture.QuantiteRestante += entreeFourniture.QuantiteEntree;
 
-            return sommeProduits / sommeQuantites;
+            // Recalculer les valeurs
+            CalculerValeurs(fourniture);
+
+            try
+            {
+                await _context.SaveChangesAsync();
+                fourniture.CMUP = CalculerCMUP(fourniture.Id);
+                return Ok(fourniture);
+            }
+            catch (DbUpdateConcurrencyException)
+            {
+                if (!FournitureExists(id))
+                {
+                    return NotFound();
+                }
+                else
+                {
+                    throw;
+                }
+            }
         }
 
-        private void CalculerValeurs(Fourniture fourniture, bool isNew)
+        private decimal CalculerCMUP(int fournitureId)
         {
-            // Calcul du montant: prix_unitaire * quantité
-            fourniture.Montant = fourniture.PrixUnitaire * fourniture.Quantite;
+            var fourniture = _context.Fournitures
+                .Include(f => f.EntreesFournitures)
+                .FirstOrDefault(f => f.Id == fournitureId);
 
-            // Si c'est une nouvelle fourniture, initialiser la quantité restante
-            if (isNew)
+            if (fourniture == null || !fourniture.EntreesFournitures.Any())
             {
-                fourniture.QuantiteRestante = fourniture.Quantite;
+                return 0;
             }
 
-            // Calcul du prix total: quantité_restante * prix_unitaire
+            var sommeProduits = fourniture.EntreesFournitures.Sum(e => e.QuantiteEntree * e.PrixUnitaire);
+            var sommeQuantites = fourniture.EntreesFournitures.Sum(e => e.QuantiteEntree);
+
+            return sommeQuantites == 0 ? 0 : sommeProduits / sommeQuantites;
+        }
+
+        private void CalculerValeurs(Fourniture fourniture)
+        {
+            var entrees = fourniture.EntreesFournitures.ToList();
+            fourniture.Quantite = entrees.Sum(e => e.QuantiteEntree);
+            fourniture.Montant = entrees.Sum(e => e.Montant);
             fourniture.PrixTotal = fourniture.QuantiteRestante * fourniture.PrixUnitaire;
         }
 
