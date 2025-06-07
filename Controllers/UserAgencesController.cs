@@ -75,6 +75,21 @@ namespace GestionFournituresAPI.Controllers
             return _mapper.Map<List<UserAgenceDto>>(userAgences);
         }
 
+         [HttpGet("GetAgenceByUserId/{userId}")]
+            public IActionResult GetAgenceByUserId(int userId)
+            {
+                Console.WriteLine($"Requête reçue pour userId: {userId}");
+                var userAgence = _context.UserAgences
+                    .Where(ua => ua.UserId == userId)
+                    .Select(ua => new { agenceId = ua.AgenceId })
+                    .FirstOrDefault();
+
+                if (userAgence == null)
+                    return NotFound("Aucune agence trouvée pour cet utilisateur.");
+
+                return Ok(userAgence);
+            }
+
         // POST: api/UserAgences
         [HttpPost]
         public async Task<ActionResult<UserAgenceDto>> PostUserAgence(UserAgence userAgence)

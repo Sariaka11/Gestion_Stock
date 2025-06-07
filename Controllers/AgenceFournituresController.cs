@@ -1,8 +1,8 @@
-using GestionFournituresAPI.Data;
-using GestionFournituresAPI.Models;
-using GestionFournituresAPI.Models.Dtos;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using GestionFournituresAPI.Data;
+using GestionFournituresAPI.Models;
+using GestionFournituresAPI.Dtos;
 
 namespace GestionFournituresAPI.Controllers
 {
@@ -17,37 +17,31 @@ namespace GestionFournituresAPI.Controllers
             _context = context;
         }
 
-        // GET: api/AgenceFournitures
-        [HttpGet]
-        public async Task<ActionResult<IEnumerable<AgenceFournitureDto>>> GetAgenceFournitures()
+        // GET: api/AgenceFournitures/ByAgence/5 (filtré par agenceId)
+        [HttpGet("ByAgence/{agenceId}")]
+        public async Task<ActionResult<IEnumerable<AgenceFournitureDto>>> GetAgenceFournitures(int agenceId)
         {
             var agenceFournitures = await _context.AgenceFournitures
+                .Where(af => af.AgenceId == agenceId) // Filtrer par agenceId
                 .Include(af => af.Agence)
                 .Include(af => af.Fourniture)
-                .Select(af => new
+                .Select(af => new AgenceFournitureDto
                 {
-                    af.Id,
-                    af.AgenceId,
-                    AgenceNom = af.Agence != null ? af.Agence.Nom : null,
-                    af.FournitureId,
-                    FournitureNom = af.Fourniture != null ? af.Fourniture.Nom : null,
-                    af.Quantite,
-                    af.DateAssociation
+                    Id = af.Id,
+                    AgenceId = af.AgenceId,
+                    AgenceNom = af.Agence != null ? af.Agence.Nom : "Agence inconnue",
+                    FournitureId = af.FournitureId,
+                    FournitureNom = af.Fourniture != null ? af.Fourniture.Nom : "Fourniture inconnue",
+                    Categorie = af.Fourniture != null ? af.Fourniture.Categorie : "Non catégorisé",
+                    Quantite = af.Quantite,
+                    DateAssociation = af.DateAssociation
                 })
                 .ToListAsync();
 
-            var result = agenceFournitures.Select(af => new AgenceFournitureDto
-            {
-                Id = af.Id,
-                AgenceId = af.AgenceId,
-                AgenceNom = af.AgenceNom ?? "Agence inconnue",
-                FournitureId = af.FournitureId,
-                FournitureNom = af.FournitureNom ?? "Fourniture inconnue",
-                Quantite = af.Quantite,
-                DateAssociation = af.DateAssociation
-            }).ToList();
+            if (agenceFournitures == null || !agenceFournitures.Any())
+                return NotFound("Aucune fourniture trouvée pour cette agence.");
 
-            return Ok(result);
+            return Ok(agenceFournitures);
         }
 
         // GET: api/AgenceFournitures/5
@@ -88,40 +82,6 @@ namespace GestionFournituresAPI.Controllers
             return Ok(result);
         }
 
-        // GET: api/AgenceFournitures/ByAgence/5
-        [HttpGet("ByAgence/{agenceId}")]
-        public async Task<ActionResult<IEnumerable<AgenceFournitureDto>>> GetByAgence(int agenceId)
-        {
-            var agenceFournitures = await _context.AgenceFournitures
-                .Include(af => af.Fourniture)
-                .Include(af => af.Agence)
-                .Where(af => af.AgenceId == agenceId)
-                .Select(af => new
-                {
-                    af.Id,
-                    af.AgenceId,
-                    AgenceNom = af.Agence != null ? af.Agence.Nom : null,
-                    af.FournitureId,
-                    FournitureNom = af.Fourniture != null ? af.Fourniture.Nom : null,
-                    af.Quantite,
-                    af.DateAssociation
-                })
-                .ToListAsync();
-
-            var result = agenceFournitures.Select(af => new AgenceFournitureDto
-            {
-                Id = af.Id,
-                AgenceId = af.AgenceId,
-                AgenceNom = af.AgenceNom ?? "Agence inconnue",
-                FournitureId = af.FournitureId,
-                FournitureNom = af.FournitureNom ?? "Fourniture inconnue",
-                Quantite = af.Quantite,
-                DateAssociation = af.DateAssociation
-            }).ToList();
-
-            return Ok(result);
-        }
-
         // GET: api/AgenceFournitures/ByFourniture/5
         [HttpGet("ByFourniture/{fournitureId}")]
         public async Task<ActionResult<IEnumerable<AgenceFournitureDto>>> GetByFourniture(int fournitureId)
@@ -155,6 +115,29 @@ namespace GestionFournituresAPI.Controllers
 
             return Ok(result);
         }
+
+        // Controllers/AgenceFournituresController.cs
+[HttpGet]
+public async Task<ActionResult<IEnumerable<AgenceFournitureDto>>> GetAgenceFournitures()
+{
+    var agenceFournitures = await _context.AgenceFournitures
+        .Include(af => af.Agence)
+        .Include(af => af.Fourniture)
+        .Select(af => new AgenceFournitureDto
+        {
+            Id = af.Id,
+            AgenceId = af.AgenceId,
+            AgenceNom = af.Agence != null ? af.Agence.Nom : "Agence inconnue",
+            FournitureId = af.FournitureId,
+            FournitureNom = af.Fourniture != null ? af.Fourniture.Nom : "Fourniture inconnue",
+            Categorie = af.Fourniture != null ? af.Fourniture.Categorie : "Non catégorisé",
+            Quantite = af.Quantite,
+            DateAssociation = af.DateAssociation
+        })
+        .ToListAsync();
+
+    return Ok(agenceFournitures);
+}
 
         // POST: api/AgenceFournitures
         [HttpPost]
