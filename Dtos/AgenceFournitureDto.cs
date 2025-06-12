@@ -17,10 +17,11 @@ namespace GestionFournituresAPI.Dtos
         public DateTime DateAssociation { get; set; }
     }
 
-      public class ConsommationCreateDto
+    public class ConsommationCreateDto
     {
         public int AgenceId { get; set; }
         public int FournitureId { get; set; }
         public decimal? ConsoMm { get; set; }
+        public DateTime DateAffectation { get; set; }
     }
 }
