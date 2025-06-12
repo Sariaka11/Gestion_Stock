@@ -18,6 +18,9 @@ namespace GestionFournituresAPI.Models
         [Column("QUANTITE")]
         public int? Quantite { get; set; }
 
+         [Column("QUANTITE_CONSO")]
+        public decimal? QuantiteConso { get; set; }
+
         // Navigation properties
         [ForeignKey("IdBien")]
         public virtual Immobilisation? Immobilisation { get; set; }

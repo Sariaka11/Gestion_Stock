@@ -17,12 +17,12 @@ namespace GestionFournituresAPI.Controllers
             _context = context;
         }
 
-        // GET: api/AgenceFournitures/ByAgence/5 (filtré par agenceId)
+        // GET: api/AgenceFournitures/ByAgence/5
         [HttpGet("ByAgence/{agenceId}")]
         public async Task<ActionResult<IEnumerable<AgenceFournitureDto>>> GetAgenceFournitures(int agenceId)
         {
             var agenceFournitures = await _context.AgenceFournitures
-                .Where(af => af.AgenceId == agenceId) // Filtrer par agenceId
+                .Where(af => af.AgenceId == agenceId)
                 .Include(af => af.Agence)
                 .Include(af => af.Fourniture)
                 .Select(af => new AgenceFournitureDto
@@ -34,7 +34,8 @@ namespace GestionFournituresAPI.Controllers
                     FournitureNom = af.Fourniture != null ? af.Fourniture.Nom : "Fourniture inconnue",
                     Categorie = af.Fourniture != null ? af.Fourniture.Categorie : "Non catégorisé",
                     Quantite = af.Quantite,
-                    DateAssociation = af.DateAssociation
+                    DateAssociation = af.DateAssociation,
+                    ConsoMm = af.ConsoMm
                 })
                 .ToListAsync();
 
@@ -59,7 +60,8 @@ namespace GestionFournituresAPI.Controllers
                     af.FournitureId,
                     FournitureNom = af.Fourniture != null ? af.Fourniture.Nom : null,
                     af.Quantite,
-                    af.DateAssociation
+                    af.DateAssociation,
+                    af.ConsoMm
                 })
                 .FirstOrDefaultAsync(af => af.Id == id);
 
@@ -76,7 +78,8 @@ namespace GestionFournituresAPI.Controllers
                 FournitureId = agenceFourniture.FournitureId,
                 FournitureNom = agenceFourniture.FournitureNom ?? "Fourniture inconnue",
                 Quantite = agenceFourniture.Quantite,
-                DateAssociation = agenceFourniture.DateAssociation
+                DateAssociation = agenceFourniture.DateAssociation,
+                ConsoMm = agenceFourniture.ConsoMm
             };
 
             return Ok(result);
@@ -98,7 +101,8 @@ namespace GestionFournituresAPI.Controllers
                     af.FournitureId,
                     FournitureNom = af.Fourniture != null ? af.Fourniture.Nom : null,
                     af.Quantite,
-                    af.DateAssociation
+                    af.DateAssociation,
+                    af.ConsoMm
                 })
                 .ToListAsync();
 
@@ -110,46 +114,46 @@ namespace GestionFournituresAPI.Controllers
                 FournitureId = af.FournitureId,
                 FournitureNom = af.FournitureNom ?? "Fourniture inconnue",
                 Quantite = af.Quantite,
-                DateAssociation = af.DateAssociation
+                DateAssociation = af.DateAssociation,
+                ConsoMm = af.ConsoMm
             }).ToList();
 
             return Ok(result);
         }
 
-        // Controllers/AgenceFournituresController.cs
-[HttpGet]
-public async Task<ActionResult<IEnumerable<AgenceFournitureDto>>> GetAgenceFournitures()
-{
-    var agenceFournitures = await _context.AgenceFournitures
-        .Include(af => af.Agence)
-        .Include(af => af.Fourniture)
-        .Select(af => new AgenceFournitureDto
+        // GET: api/AgenceFournitures
+        [HttpGet]
+        public async Task<ActionResult<IEnumerable<AgenceFournitureDto>>> GetAgenceFournitures()
         {
-            Id = af.Id,
-            AgenceId = af.AgenceId,
-            AgenceNom = af.Agence != null ? af.Agence.Nom : "Agence inconnue",
-            FournitureId = af.FournitureId,
-            FournitureNom = af.Fourniture != null ? af.Fourniture.Nom : "Fourniture inconnue",
-            Categorie = af.Fourniture != null ? af.Fourniture.Categorie : "Non catégorisé",
-            Quantite = af.Quantite,
-            DateAssociation = af.DateAssociation
-        })
-        .ToListAsync();
+            var agenceFournitures = await _context.AgenceFournitures
+                .Include(af => af.Agence)
+                .Include(af => af.Fourniture)
+                .Select(af => new AgenceFournitureDto
+                {
+                    Id = af.Id,
+                    AgenceId = af.AgenceId,
+                    AgenceNom = af.Agence != null ? af.Agence.Nom : "Agence inconnue",
+                    FournitureId = af.FournitureId,
+                    FournitureNom = af.Fourniture != null ? af.Fourniture.Nom : "Fourniture inconnue",
+                    Categorie = af.Fourniture != null ? af.Fourniture.Categorie : "Non catégorisé",
+                    Quantite = af.Quantite,
+                    DateAssociation = af.DateAssociation,
+                    ConsoMm = af.ConsoMm
+                })
+                .ToListAsync();
 
-    return Ok(agenceFournitures);
-}
+            return Ok(agenceFournitures);
+        }
 
         // POST: api/AgenceFournitures
         [HttpPost]
         public async Task<ActionResult<AgenceFournitureDto>> PostAgenceFourniture(AgenceFourniture agenceFourniture)
         {
-            // Vérifier si l'agence existe
             if (!_context.Agences.Any(a => a.Id == agenceFourniture.AgenceId))
             {
                 return BadRequest("L'agence spécifiée n'existe pas.");
             }
 
-            // Vérifier si la fourniture existe
             var fourniture = await _context.Fournitures
                 .FirstOrDefaultAsync(f => f.Id == agenceFourniture.FournitureId);
             if (fourniture == null)
@@ -157,13 +161,11 @@ public async Task<ActionResult<IEnumerable<AgenceFournitureDto>>> GetAgenceFourn
                 return BadRequest("La fourniture spécifiée n'existe pas.");
             }
 
-            // Vérifier si la quantité est suffisante
             if (fourniture.QuantiteRestante < agenceFourniture.Quantite)
             {
                 return BadRequest("La quantité demandée dépasse le stock restant.");
             }
 
-            // Vérifier si l'association existe déjà
             var existing = await _context.AgenceFournitures
                 .FirstOrDefaultAsync(af =>
                     af.AgenceId == agenceFourniture.AgenceId &&
@@ -172,50 +174,46 @@ public async Task<ActionResult<IEnumerable<AgenceFournitureDto>>> GetAgenceFourn
             int resultId;
             if (existing != null)
             {
-                // Vérifier si la quantité mise à jour dépasse le stock restant
                 if (fourniture.QuantiteRestante < (existing.Quantite + agenceFourniture.Quantite))
                 {
                     return BadRequest("La quantité totale dépasse le stock restant.");
                 }
 
-                // Mettre à jour la quantité existante
                 existing.Quantite += agenceFourniture.Quantite;
                 existing.DateAssociation = DateTime.Now;
                 _context.AgenceFournitures.Update(existing);
                 resultId = existing.Id;
 
-                // Mettre à jour la quantité restante
                 fourniture.QuantiteRestante -= agenceFourniture.Quantite;
                 _context.Fournitures.Update(fourniture);
             }
             else
             {
-                // Créer une nouvelle association
                 agenceFourniture.DateAssociation = DateTime.Now;
                 _context.AgenceFournitures.Add(agenceFourniture);
                 resultId = agenceFourniture.Id;
 
-                // Mettre à jour la quantité restante
                 fourniture.QuantiteRestante -= agenceFourniture.Quantite;
                 _context.Fournitures.Update(fourniture);
             }
 
             await _context.SaveChangesAsync();
 
-            // Retourner le DTO de l'association créée ou mise à jour
             var result = await _context.AgenceFournitures
                 .Include(af => af.Agence)
                 .Include(af => af.Fourniture)
                 .Where(af => af.Id == resultId)
-                .Select(af => new
+                .Select(af => new AgenceFournitureDto
                 {
-                    af.Id,
-                    af.AgenceId,
-                    AgenceNom = af.Agence != null ? af.Agence.Nom : null,
-                    af.FournitureId,
-                    FournitureNom = af.Fourniture != null ? af.Fourniture.Nom : null,
-                    af.Quantite,
-                    af.DateAssociation
+                    Id = af.Id,
+                    AgenceId = af.AgenceId,
+                    AgenceNom = af.Agence != null ? af.Agence.Nom : "Agence inconnue",
+                    FournitureId = af.FournitureId,
+                    FournitureNom = af.Fourniture != null ? af.Fourniture.Nom : "Fourniture inconnue",
+                    Categorie = af.Fourniture != null ? af.Fourniture.Categorie : "Non catégorisé",
+                    Quantite = af.Quantite,
+                    DateAssociation = af.DateAssociation,
+                    ConsoMm = af.ConsoMm
                 })
                 .FirstOrDefaultAsync();
 
@@ -224,18 +222,147 @@ public async Task<ActionResult<IEnumerable<AgenceFournitureDto>>> GetAgenceFourn
                 return NotFound("Erreur lors de la récupération de l'association créée.");
             }
 
-            var resultDto = new AgenceFournitureDto
-            {
-                Id = result.Id,
-                AgenceId = result.AgenceId,
-                AgenceNom = result.AgenceNom ?? "Agence inconnue",
-                FournitureId = result.FournitureId,
-                FournitureNom = result.FournitureNom ?? "Fourniture inconnue",
-                Quantite = result.Quantite,
-                DateAssociation = result.DateAssociation
-            };
+            return CreatedAtAction(nameof(GetAgenceFourniture), new { id = result.Id }, result);
+        }
 
-            return CreatedAtAction(nameof(GetAgenceFourniture), new { id = resultDto.Id }, resultDto);
+        // POST: api/AgenceFournitures/Consommation
+        [HttpPost("Consommation")]
+        public async Task<ActionResult<AgenceFournitureDto>> CreateConsommation([FromBody] ConsommationCreateDto createDto)
+        {
+            if (!await _context.Agences.AnyAsync(a => a.Id == createDto.AgenceId))
+            {
+                return BadRequest("L'agence spécifiée n'existe pas.");
+            }
+
+            var fourniture = await _context.Fournitures
+                .FirstOrDefaultAsync(f => f.Id == createDto.FournitureId);
+            if (fourniture == null)
+            {
+                return BadRequest("La fourniture spécifiée n'existe pas.");
+            }
+
+            if (!createDto.ConsoMm.HasValue || createDto.ConsoMm <= 0)
+            {
+                return BadRequest("La consommation doit être un nombre positif.");
+            }
+
+            var existing = await _context.AgenceFournitures
+                .FirstOrDefaultAsync(af => af.AgenceId == createDto.AgenceId && af.FournitureId == createDto.FournitureId);
+
+            int resultId;
+            if (existing != null)
+            {
+                if (existing.Quantite < createDto.ConsoMm)
+                {
+                    return BadRequest("La consommation dépasse la quantité disponible dans l'agence.");
+                }
+                existing.Quantite = Math.Max(0, existing.Quantite - (int)createDto.ConsoMm.Value);
+                existing.ConsoMm = createDto.ConsoMm;
+                existing.DateAssociation = DateTime.Now;
+                _context.AgenceFournitures.Update(existing);
+                resultId = existing.Id;
+            }
+            else
+            {
+                var agenceFourniture = new AgenceFourniture
+                {
+                    AgenceId = createDto.AgenceId,
+                    FournitureId = createDto.FournitureId,
+                    Quantite = 0,
+                    ConsoMm = createDto.ConsoMm,
+                    DateAssociation = DateTime.Now
+                };
+                _context.AgenceFournitures.Add(agenceFourniture);
+                resultId = agenceFourniture.Id;
+            }
+
+            await _context.SaveChangesAsync();
+
+            var result = await _context.AgenceFournitures
+                .Include(af => af.Agence)
+                .Include(af => af.Fourniture)
+                .Where(af => af.Id == resultId)
+                .Select(af => new AgenceFournitureDto
+                {
+                    Id = af.Id,
+                    AgenceId = af.AgenceId,
+                    AgenceNom = af.Agence != null ? af.Agence.Nom : "Agence inconnue",
+                    FournitureId = af.FournitureId,
+                    FournitureNom = af.Fourniture != null ? af.Fourniture.Nom : "Fourniture inconnue",
+                    Categorie = af.Fourniture != null ? af.Fourniture.Categorie : "Non catégorisé",
+                    Quantite = af.Quantite,
+                    DateAssociation = af.DateAssociation,
+                    ConsoMm = af.ConsoMm
+                })
+                .FirstOrDefaultAsync();
+
+            if (result == null)
+            {
+                return NotFound("Erreur lors de la récupération de la consommation créée.");
+            }
+
+            return CreatedAtAction(nameof(GetAgenceFourniture), new { id = result.Id }, result);
+        }
+
+        // POST: api/AgenceFournitures/Consommation/Add
+        [HttpPost("Consommation/Add")]
+        public async Task<ActionResult<AgenceFournitureDto>> AddConsommation([FromBody] ConsommationCreateDto createDto)
+        {
+            var existing = await _context.AgenceFournitures
+                .FirstOrDefaultAsync(af => af.AgenceId == createDto.AgenceId && af.FournitureId == createDto.FournitureId);
+            if (existing == null)
+            {
+                return NotFound("Aucune association existante pour cette agence et fourniture.");
+            }
+
+            var fourniture = await _context.Fournitures
+                .FirstOrDefaultAsync(f => f.Id == createDto.FournitureId);
+            if (fourniture == null)
+            {
+                return BadRequest("La fourniture spécifiée n'existe pas.");
+            }
+
+            if (!createDto.ConsoMm.HasValue || createDto.ConsoMm <= 0)
+            {
+                return BadRequest("La consommation doit être un nombre positif.");
+            }
+
+            if (existing.Quantite < createDto.ConsoMm)
+            {
+                return BadRequest("La consommation dépasse la quantité disponible dans l'agence.");
+            }
+
+            existing.Quantite = Math.Max(0, existing.Quantite - (int)createDto.ConsoMm.Value);
+            existing.ConsoMm = createDto.ConsoMm;
+            existing.DateAssociation = DateTime.Now;
+            _context.AgenceFournitures.Update(existing);
+
+            await _context.SaveChangesAsync();
+
+            var result = await _context.AgenceFournitures
+                .Include(af => af.Agence)
+                .Include(af => af.Fourniture)
+                .Where(af => af.Id == existing.Id)
+                .Select(af => new AgenceFournitureDto
+                {
+                    Id = af.Id,
+                    AgenceId = af.AgenceId,
+                    AgenceNom = af.Agence != null ? af.Agence.Nom : "Agence inconnue",
+                    FournitureId = af.FournitureId,
+                    FournitureNom = af.Fourniture != null ? af.Fourniture.Nom : "Fourniture inconnue",
+                    Categorie = af.Fourniture != null ? af.Fourniture.Categorie : "Non catégorisé",
+                    Quantite = af.Quantite,
+                    DateAssociation = af.DateAssociation,
+                    ConsoMm = af.ConsoMm
+                })
+                .FirstOrDefaultAsync();
+
+            if (result == null)
+            {
+                return NotFound("Erreur lors de la récupération de la consommation mise à jour.");
+            }
+
+            return Ok(result);
         }
 
         // PUT: api/AgenceFournitures/Agence/1/Fourniture/1
@@ -250,26 +377,26 @@ public async Task<ActionResult<IEnumerable<AgenceFournitureDto>>> GetAgenceFourn
                 return NotFound($"Association entre l'agence {agenceId} et la fourniture {fournitureId} non trouvée.");
             }
 
-            // Mettre à jour la quantité
             agenceFourniture.Quantite = updateDto.Quantite;
             agenceFourniture.DateAssociation = DateTime.Now;
             _context.AgenceFournitures.Update(agenceFourniture);
             await _context.SaveChangesAsync();
 
-            // Retourner le DTO mis à jour
             var result = await _context.AgenceFournitures
                 .Include(af => af.Agence)
                 .Include(af => af.Fourniture)
                 .Where(af => af.Id == agenceFourniture.Id)
-                .Select(af => new
+                .Select(af => new AgenceFournitureDto
                 {
-                    af.Id,
-                    af.AgenceId,
-                    AgenceNom = af.Agence != null ? af.Agence.Nom : null,
-                    af.FournitureId,
-                    FournitureNom = af.Fourniture != null ? af.Fourniture.Nom : null,
-                    af.Quantite,
-                    af.DateAssociation
+                    Id = af.Id,
+                    AgenceId = af.AgenceId,
+                    AgenceNom = af.Agence != null ? af.Agence.Nom : "Agence inconnue",
+                    FournitureId = af.FournitureId,
+                    FournitureNom = af.Fourniture != null ? af.Fourniture.Nom : "Fourniture inconnue",
+                    Categorie = af.Fourniture != null ? af.Fourniture.Categorie : "Non catégorisé",
+                    Quantite = af.Quantite,
+                    DateAssociation = af.DateAssociation,
+                    ConsoMm = af.ConsoMm
                 })
                 .FirstOrDefaultAsync();
 
@@ -278,18 +405,7 @@ public async Task<ActionResult<IEnumerable<AgenceFournitureDto>>> GetAgenceFourn
                 return NotFound("Erreur lors de la récupération de l'association mise à jour.");
             }
 
-            var resultDto = new AgenceFournitureDto
-            {
-                Id = result.Id,
-                AgenceId = result.AgenceId,
-                AgenceNom = result.AgenceNom ?? "Agence inconnue",
-                FournitureId = result.FournitureId,
-                FournitureNom = result.FournitureNom ?? "Fourniture inconnue",
-                Quantite = result.Quantite,
-                DateAssociation = result.DateAssociation
-            };
-
-            return Ok(resultDto);
+            return Ok(result);
         }
 
         // DELETE: api/AgenceFournitures/Agence/1/Fourniture/1
@@ -316,7 +432,26 @@ public async Task<ActionResult<IEnumerable<AgenceFournitureDto>>> GetAgenceFourn
         }
     }
 
-    // DTO pour la mise à jour
+    public class AgenceFournitureDto
+    {
+        public int Id { get; set; }
+        public int AgenceId { get; set; }
+        public string AgenceNom { get; set; }
+        public int FournitureId { get; set; }
+        public string FournitureNom { get; set; }
+        public string Categorie { get; set; }
+        public int Quantite { get; set; }
+        public DateTime DateAssociation { get; set; }
+        public decimal? ConsoMm { get; set; }
+    }
+
+    public class ConsommationCreateDto
+    {
+        public int AgenceId { get; set; }
+        public int FournitureId { get; set; }
+        public decimal? ConsoMm { get; set; }
+    }
+
     public class AgenceFournitureUpdateDto
     {
         public int Quantite { get; set; }

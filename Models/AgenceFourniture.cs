@@ -25,6 +25,9 @@ namespace GestionFournituresAPI.Models
         [Column("DATE_ASSOCIATION")]
         public DateTime DateAssociation { get; set; } = DateTime.Now;
 
+        [Column("CONSO_MM")]
+        public decimal? ConsoMm { get; set; } 
+
         // Navigation properties
         [ForeignKey("AgenceId")]
         public virtual Agence? Agence { get; set; }

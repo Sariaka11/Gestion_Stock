@@ -61,35 +61,35 @@ namespace GestionFournituresAPI.Controllers
         {
             if (createDto == null)
             {
-                return BadRequest("Données d'entrée invalides.");
+                return BadRequest("Donnï¿½es d'entrï¿½e invalides.");
             }
 
-            // Vérifier si la catégorie existe
+            // Vï¿½rifier si la catï¿½gorie existe
             var categorie = await _context.Categories
                 .FirstOrDefaultAsync(c => c.IdCategorie == createDto.IdCategorie);
             if (categorie == null)
             {
-                return BadRequest("La catégorie spécifiée n'existe pas.");
+                return BadRequest("La catï¿½gorie spï¿½cifiï¿½e n'existe pas.");
             }
 
             var immobilisation = _mappingService.ToEntity(createDto);
             if (immobilisation == null)
             {
-                return BadRequest("Erreur lors du mappage des données.");
+                return BadRequest("Erreur lors du mappage des donnï¿½es.");
             }
 
-            // Vérifier que la date d'acquisition est fournie
+            // Vï¿½rifier que la date d'acquisition est fournie
             if (!immobilisation.DateAcquisition.HasValue)
             {
                 return BadRequest("La date d'acquisition est requise pour calculer l'amortissement.");
             }
 
-            // Calculer le taux d'amortissement à partir de la durée de la catégorie
+            // Calculer le taux d'amortissement ï¿½ partir de la durï¿½e de la catï¿½gorie
             decimal tauxAmortissement = 100m / categorie.DureeAmortissement;
             decimal amortissementAnnuel = immobilisation.ValeurAcquisition * (tauxAmortissement / 100m);
             decimal valeurResiduelle = immobilisation.ValeurAcquisition;
 
-            // Générer les enregistrements d'amortissement
+            // Gï¿½nï¿½rer les enregistrements d'amortissement
             immobilisation.Amortissements = new List<Amortissement>();
             int anneeDebut = immobilisation.DateAcquisition.Value.Year;
             for (int i = 0; i < categorie.DureeAmortissement; i++)
@@ -106,7 +106,7 @@ namespace GestionFournituresAPI.Controllers
                 immobilisation.Amortissements.Add(amortissement);
             }
 
-            // Calculer les propriétés dérivées
+            // Calculer les propriï¿½tï¿½s dï¿½rivï¿½es
             await CalculerProprietesDerivees(immobilisation);
 
             // Enregistrer l'immobilisation et les amortissements
@@ -123,7 +123,7 @@ namespace GestionFournituresAPI.Controllers
         {
             if (updateDto == null)
             {
-                return BadRequest("Données d'entrée invalides.");
+                return BadRequest("Donnï¿½es d'entrï¿½e invalides.");
             }
 
             var immobilisation = await _context.Immobilisations
@@ -135,19 +135,19 @@ namespace GestionFournituresAPI.Controllers
                 return NotFound();
             }
 
-            // Mettre à jour l'entité
+            // Mettre ï¿½ jour l'entitï¿½
             _mappingService.UpdateEntity(immobilisation, updateDto);
 
-            // Vérifier si la catégorie existe
+            // Vï¿½rifier si la catï¿½gorie existe
             var categorie = await _context.Categories
                 .FirstOrDefaultAsync(c => c.IdCategorie == immobilisation.IdCategorie);
             if (categorie == null)
             {
-                return BadRequest("La catégorie spécifiée n'existe pas.");
+                return BadRequest("La catï¿½gorie spï¿½cifiï¿½e n'existe pas.");
             }
 
-            // Recalculer les amortissements si nécessaire
-            // Puisque ValeurAcquisition est requis, il est toujours présent
+            // Recalculer les amortissements si nï¿½cessaire
+            // Puisque ValeurAcquisition est requis, il est toujours prï¿½sent
             if (updateDto.IdCategorie.HasValue || updateDto.DateAcquisition.HasValue)
             {
                 // Supprimer les anciens amortissements
@@ -181,7 +181,7 @@ namespace GestionFournituresAPI.Controllers
                 }
             }
 
-            // Recalculer les propriétés dérivées
+            // Recalculer les propriï¿½tï¿½s dï¿½rivï¿½es
             await CalculerProprietesDerivees(immobilisation);
 
             try
@@ -211,18 +211,18 @@ namespace GestionFournituresAPI.Controllers
 
                 if (immobilisation == null)
                 {
-                    Console.WriteLine($"Immobilisation non trouvée pour IdBien: {id}");
-                    return NotFound("Immobilisation non trouvée.");
+                    Console.WriteLine($"Immobilisation non trouvï¿½e pour IdBien: {id}");
+                    return NotFound("Immobilisation non trouvï¿½e.");
                 }
 
-                // Vérifier les affectations associées dans BIEN_AGENCE
+                // Vï¿½rifier les affectations associï¿½es dans BIEN_AGENCE
                 var affectations = await _context.BienAgences
                     .Where(ba => ba.IdBien == id)
                     .ToListAsync();
 
                 if (affectations.Any())
                 {
-                    // Supprimer les affectations associées
+                    // Supprimer les affectations associï¿½es
                     Console.WriteLine($"Suppression de {affectations.Count} affectations pour IdBien: {id}");
                     _context.BienAgences.RemoveRange(affectations);
                 }
@@ -231,7 +231,7 @@ namespace GestionFournituresAPI.Controllers
                 _context.Immobilisations.Remove(immobilisation);
                 await _context.SaveChangesAsync();
 
-                Console.WriteLine($"Immobilisation supprimée avec succès: IdBien={id}");
+                Console.WriteLine($"Immobilisation supprimï¿½e avec succï¿½s: IdBien={id}");
                 return NoContent();
             }
             catch (Exception ex)
@@ -254,11 +254,11 @@ namespace GestionFournituresAPI.Controllers
                 .OrderBy(a => a.Annee)
                 .ToListAsync();
 
-            // Calculer l'amortissement cumulé et la valeur nette comptable
+            // Calculer l'amortissement cumulï¿½ et la valeur nette comptable
             immobilisation.AmortissementCumule = amortissements.Sum(a => a.Montant);
             immobilisation.ValeurNetteComptable = immobilisation.ValeurAcquisition - immobilisation.AmortissementCumule;
 
-            // Charger la catégorie
+            // Charger la catï¿½gorie
             var categorie = await _context.Categories
                 .FirstOrDefaultAsync(c => c.IdCategorie == immobilisation.IdCategorie);
 
@@ -271,7 +271,7 @@ namespace GestionFournituresAPI.Controllers
 
                 immobilisation.DateFinAmortissement = immobilisation.DateAcquisition.Value.AddYears(categorie.DureeAmortissement);
 
-                // Déterminer le statut
+                // Dï¿½terminer le statut
                 immobilisation.Statut = immobilisation.DureeRestante == 0 ? "amorti" : "actif";
             }
             else

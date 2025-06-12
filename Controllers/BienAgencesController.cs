@@ -1,8 +1,8 @@
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using GestionFournituresAPI.Data;
 using GestionFournituresAPI.Dtos;
 using GestionFournituresAPI.Models;
-using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
 using AutoMapper;
 using System;
 
@@ -21,6 +21,121 @@ namespace GestionFournituresAPI.Controllers
             _mapper = mapper;
         }
 
+        // POST: api/BienAgences
+        [HttpPost]
+        public async Task<IActionResult> PostBienAgence(BienAgenceDto dto)
+        {
+            try
+            {
+                if (!ModelState.IsValid)
+                {
+                    Console.WriteLine("ModelState invalide: " + string.Join(", ", ModelState.Values.SelectMany(v => v.Errors).Select(e => e.ErrorMessage)));
+                    return BadRequest(ModelState);
+                }
+
+                if (!dto.Quantite.HasValue || dto.Quantite <= 0)
+                {
+                    Console.WriteLine("Quantit√© non valide: " + dto.Quantite);
+                    return BadRequest("La quantit√© doit √™tre un nombre positif.");
+                }
+
+                var immobilisation = await _context.Immobilisations
+                    .Include(i => i.Categorie)
+                    .FirstOrDefaultAsync(i => i.IdBien == dto.IdBien);
+                if (immobilisation == null)
+                {
+                    Console.WriteLine($"Immobilisation non trouv√©e pour IdBien: {dto.IdBien}");
+                    return NotFound("Le bien sp√©cifi√© n'existe pas.");
+                }
+
+                Console.WriteLine($"Stock disponible: {immobilisation.Quantite}, Quantit√© demand√©e: {dto.Quantite}");
+                if (immobilisation.Quantite < dto.Quantite)
+                {
+                    return BadRequest("Quantit√© insuffisante en stock.");
+                }
+
+                var agence = await _context.Agences.FirstOrDefaultAsync(a => a.Id == dto.IdAgence);
+                if (agence == null)
+                {
+                    Console.WriteLine($"Agence non trouv√©e avec ID: {dto.IdAgence}");
+                    return BadRequest($"L'agence avec l'ID {dto.IdAgence} n'existe pas.");
+                }
+
+                if (dto.DateAffectation == default)
+                {
+                    dto.DateAffectation = DateTime.Now;
+                    Console.WriteLine($"DateAffectation d√©finie √† : {dto.DateAffectation}");
+                }
+
+                var existingAffectation = await _context.BienAgences
+                    .FirstOrDefaultAsync(ba => ba.IdBien == dto.IdBien && ba.IdAgence == dto.IdAgence);
+
+                BienAgence bienAgence;
+                if (existingAffectation != null)
+                {
+                    Console.WriteLine($"Affectation existante trouv√©e: Quantit√© actuelle = {existingAffectation.Quantite}, Nouvelle quantit√© = {dto.Quantite}");
+                    existingAffectation.Quantite = (existingAffectation.Quantite ?? 0) + dto.Quantite.Value;
+                    existingAffectation.DateAffectation = dto.DateAffectation;
+                    bienAgence = existingAffectation;
+                }
+                else
+                {
+                    Console.WriteLine("Cr√©ation d'une nouvelle affectation.");
+                    bienAgence = new BienAgence
+                    {
+                        IdBien = dto.IdBien,
+                        IdAgence = dto.IdAgence,
+                        Quantite = dto.Quantite,
+                        QuantiteConso = dto.QuantiteConso ?? 0,
+                        DateAffectation = dto.DateAffectation
+                    };
+                    _context.BienAgences.Add(bienAgence);
+                }
+
+                immobilisation.Quantite -= dto.Quantite.Value;
+                Console.WriteLine($"Nouvelle quantit√© dans Immobilisations: {immobilisation.Quantite}");
+
+                await _context.SaveChangesAsync();
+
+                var affectationResult = await _context.BienAgences
+                    .Include(ba => ba.Immobilisation)
+                    .ThenInclude(i => i.Categorie)
+                    .Include(ba => ba.Agence)
+                    .FirstOrDefaultAsync(affectation =>
+                        affectation.IdBien == dto.IdBien &&
+                        affectation.IdAgence == dto.IdAgence);
+
+                if (affectationResult == null)
+                {
+                    Console.WriteLine("Erreur: Affectation non trouv√©e apr√®s sauvegarde.");
+                    return StatusCode(500, "Erreur lors de la cr√©ation de l'affectation.");
+                }
+
+                var resultDto = new BienAgenceDto
+                {
+                    IdBien = affectationResult.IdBien,
+                    IdAgence = affectationResult.IdAgence,
+                    NomBien = affectationResult.Immobilisation?.NomBien ?? "Bien inconnu",
+                    NomAgence = affectationResult.Agence?.Nom ?? "Agence inconnue",
+                    Categorie = affectationResult.Immobilisation?.Categorie?.NomCategorie ?? "Non cat√©goris√©",
+                    Quantite = affectationResult.Quantite,
+                    QuantiteConso = affectationResult.QuantiteConso,
+                    DateAffectation = affectationResult.DateAffectation,
+                    Immobilisation = _mapper.Map<ImmobilisationDto>(affectationResult.Immobilisation),
+                    Agence = _mapper.Map<AgenceDto>(affectationResult.Agence)
+                };
+
+                return CreatedAtAction(nameof(GetBienAgence),
+                    new { idBien = dto.IdBien, idAgence = dto.IdAgence },
+                    resultDto);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Erreur dans PostBienAgence: {ex.Message}\n{ex.StackTrace}");
+                return StatusCode(500, $"Erreur serveur: {ex.Message}");
+            }
+        }
+
         // GET: api/BienAgences
         [HttpGet]
         public async Task<IActionResult> GetBienAgences()
@@ -29,14 +144,28 @@ namespace GestionFournituresAPI.Controllers
             {
                 var bienAgences = await _context.BienAgences
                     .Include(ba => ba.Immobilisation)
+                    .ThenInclude(i => i.Categorie)
                     .Include(ba => ba.Agence)
                     .ToListAsync();
-                return Ok(_mapper.Map<List<BienAgenceDto>>(bienAgences));
+                var result = bienAgences.Select(ba => new BienAgenceDto
+                {
+                    IdBien = ba.IdBien,
+                    IdAgence = ba.IdAgence,
+                    NomBien = ba.Immobilisation?.NomBien ?? "Bien inconnu",
+                    NomAgence = ba.Agence?.Nom ?? "Agence inconnue",
+                    Categorie = ba.Immobilisation?.Categorie?.NomCategorie ?? "Non cat√©goris√©",
+                    Quantite = ba.Quantite,
+                    QuantiteConso = ba.QuantiteConso,
+                    DateAffectation = ba.DateAffectation,
+                    Immobilisation = _mapper.Map<ImmobilisationDto>(ba.Immobilisation),
+                    Agence = _mapper.Map<AgenceDto>(ba.Agence)
+                }).ToList();
+                return Ok(result);
             }
             catch (Exception ex)
             {
                 Console.WriteLine($"Erreur dans GetBienAgences: {ex.Message}");
-                return StatusCode(500, "Erreur lors de la rÈcupÈration des affectations.");
+                return StatusCode(500, "Erreur lors de la r√©cup√©ration des affectations.");
             }
         }
 
@@ -48,6 +177,7 @@ namespace GestionFournituresAPI.Controllers
             {
                 var bienAgences = await _context.BienAgences
                     .Include(ba => ba.Immobilisation)
+                    .ThenInclude(i => i.Categorie)
                     .Include(ba => ba.Agence)
                     .Where(ba => ba.IdBien == idBien && ba.IdAgence == idAgence)
                     .OrderByDescending(ba => ba.DateAffectation)
@@ -55,10 +185,23 @@ namespace GestionFournituresAPI.Controllers
 
                 if (bienAgences == null || !bienAgences.Any())
                 {
-                    return NotFound("Aucune affectation trouvÈe pour ce bien et cette agence.");
+                    return NotFound("Aucune affectation trouv√©e pour ce bien et cette agence.");
                 }
 
-                return Ok(_mapper.Map<List<BienAgenceDto>>(bienAgences));
+                var result = bienAgences.Select(ba => new BienAgenceDto
+                {
+                    IdBien = ba.IdBien,
+                    IdAgence = ba.IdAgence,
+                    NomBien = ba.Immobilisation?.NomBien ?? "Bien inconnu",
+                    NomAgence = ba.Agence?.Nom ?? "Agence inconnue",
+                    Categorie = ba.Immobilisation?.Categorie?.NomCategorie ?? "Non cat√©goris√©",
+                    Quantite = ba.Quantite,
+                    QuantiteConso = ba.QuantiteConso,
+                    DateAffectation = ba.DateAffectation,
+                    Immobilisation = _mapper.Map<ImmobilisationDto>(ba.Immobilisation),
+                    Agence = _mapper.Map<AgenceDto>(ba.Agence)
+                }).ToList();
+                return Ok(result);
             }
             catch (Exception ex)
             {
@@ -67,103 +210,224 @@ namespace GestionFournituresAPI.Controllers
             }
         }
 
-        // POST: api/BienAgences
-        [HttpPost]
-        public async Task<IActionResult> PostBienAgence(BienAgenceDto dto)
+        // GET: api/BienAgences/ByAgence/2
+        [HttpGet("ByAgence/{agenceId}")]
+        public async Task<IActionResult> GetBienByAgence(int agenceId)
         {
             try
             {
-                // Valider le DTO
-                if (!ModelState.IsValid)
-                {
-                    Console.WriteLine("ModelState invalide: " + string.Join(", ", ModelState.Values.SelectMany(v => v.Errors).Select(e => e.ErrorMessage)));
-                    return BadRequest(ModelState);
-                }
-
-                // VÈrifier si la quantitÈ est positive
-                if (!dto.Quantite.HasValue || dto.Quantite <= 0)
-                {
-                    Console.WriteLine("QuantitÈ non valide: " + dto.Quantite);
-                    return BadRequest("La quantitÈ doit Ítre un nombre positif.");
-                }
-
-                // VÈrifier si l'immobilisation existe et a suffisamment de stock
-                var immobilisation = await _context.Immobilisations
-                    .FirstOrDefaultAsync(i => i.IdBien == dto.IdBien);
-                if (immobilisation == null)
-                {
-                    Console.WriteLine($"Immobilisation non trouvÈe pour IdBien: {dto.IdBien}");
-                    return NotFound("Le bien spÈcifiÈ n'existe pas.");
-                }
-
-                Console.WriteLine($"Stock disponible: {immobilisation.Quantite}, QuantitÈ demandÈe: {dto.Quantite}");
-                if (immobilisation.Quantite < dto.Quantite)
-                {
-                    return BadRequest("QuantitÈ insuffisante en stock.");
-                }
-
-                // VÈrifier si l'agence existe
-                var agence = await _context.Agences.FirstOrDefaultAsync(a => a.Id == dto.IdAgence);
-                if (agence == null)
-                {
-                    Console.WriteLine($"Agence non trouvÈe avec ID: {dto.IdAgence}");
-                    return BadRequest($"L'agence avec l'ID {dto.IdAgence} n'existe pas.");
-                }
-
-                // DÈfinir la date d'affectation ‡ aujourd'hui si non spÈcifiÈe
-                if (dto.DateAffectation == default)
-                {
-                    dto.DateAffectation = DateTime.Now;
-                    Console.WriteLine($"DateAffectation dÈfinie ‡ : {dto.DateAffectation}");
-                }
-
-                // VÈrifier si une affectation existe pour IdBien et IdAgence
-                var existingAffectation = await _context.BienAgences
-                    .FirstOrDefaultAsync(ba => ba.IdBien == dto.IdBien && ba.IdAgence == dto.IdAgence);
-
-                if (existingAffectation != null)
-                {
-                    // Mettre ‡ jour la quantitÈ existante sans modifier DateAffectation
-                    Console.WriteLine($"Affectation existante trouvÈe: QuantitÈ actuelle = {existingAffectation.Quantite}, Nouvelle quantitÈ = {dto.Quantite}");
-                    existingAffectation.Quantite = (existingAffectation.Quantite ?? 0) + dto.Quantite.Value;
-                }
-                else
-                {
-                    // CrÈer une nouvelle affectation
-                    Console.WriteLine("CrÈation d'une nouvelle affectation.");
-                    var bienAgence = _mapper.Map<BienAgence>(dto);
-                    _context.BienAgences.Add(bienAgence);
-                }
-
-                // Diminuer la quantitÈ dans Immobilisations
-                immobilisation.Quantite -= dto.Quantite.Value;
-                Console.WriteLine($"Nouvelle quantitÈ dans Immobilisations: {immobilisation.Quantite}");
-
-                // Sauvegarder les changements
-                await _context.SaveChangesAsync();
-
-                // RÈcupÈrer l'affectation (existante ou nouvelle) avec relations
-                var affectationResult = await _context.BienAgences
+                var bienAgences = await _context.BienAgences
                     .Include(ba => ba.Immobilisation)
+                    .ThenInclude(i => i.Categorie)
                     .Include(ba => ba.Agence)
-                    .FirstOrDefaultAsync(affectation =>
-                        affectation.IdBien == dto.IdBien &&
-                        affectation.IdAgence == dto.IdAgence);
+                    .Where(ba => ba.IdAgence == agenceId)
+                    .ToListAsync();
 
-                if (affectationResult == null)
+                Console.WriteLine($"Nombre d'√©l√©ments trouv√©s pour agence {agenceId}: {bienAgences.Count}");
+                if (bienAgences == null || !bienAgences.Any())
                 {
-                    Console.WriteLine("Erreur: Affectation non trouvÈe aprËs sauvegarde.");
-                    return StatusCode(500, "Erreur lors de la crÈation de l'affectation.");
+                    return NotFound(new { message = "Aucune donn√©e trouv√©e pour cette agence." });
                 }
 
-                return CreatedAtAction(nameof(GetBienAgence),
-                    new { idBien = dto.IdBien, idAgence = dto.IdAgence },
-                    _mapper.Map<BienAgenceDto>(affectationResult));
+                var result = bienAgences.Select(ba => new BienAgenceDto
+                {
+                    IdBien = ba.IdBien,
+                    IdAgence = ba.IdAgence,
+                    NomBien = ba.Immobilisation?.NomBien ?? "Bien inconnu",
+                    NomAgence = ba.Agence?.Nom ?? "Agence inconnue",
+                    Categorie = ba.Immobilisation?.Categorie?.NomCategorie ?? "Non cat√©goris√©",
+                    Quantite = ba.Quantite,
+                    QuantiteConso = ba.QuantiteConso,
+                    DateAffectation = ba.DateAffectation,
+                    Immobilisation = _mapper.Map<ImmobilisationDto>(ba.Immobilisation),
+                    Agence = _mapper.Map<AgenceDto>(ba.Agence)
+                }).ToList();
+                return Ok(result);
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Erreur dans PostBienAgence: {ex.Message}\n{ex.StackTrace}");
-                return StatusCode(500, $"Erreur serveur: {ex.Message}");
+                Console.WriteLine($"Erreur dans GetBienByAgence: {ex.Message}");
+                return StatusCode(500, "Erreur lors de la r√©cup√©ration des biens par agence.");
+            }
+        }
+
+        // POST: api/BienAgences/Consommation
+        [HttpPost("Consommation")]
+        public async Task<ActionResult<BienAgenceDto>> CreateConsommation([FromBody] ConsommationBienCreateDto createDto)
+        {
+            try
+            {
+                if (!await _context.Agences.AnyAsync(a => a.Id == createDto.AgenceId))
+                {
+                    return BadRequest("L'agence sp√©cifi√©e n'existe pas.");
+                }
+
+                var immobilisation = await _context.Immobilisations
+                    .Include(i => i.Categorie)
+                    .FirstOrDefaultAsync(i => i.IdBien == createDto.BienId);
+                if (immobilisation == null)
+                {
+                    return BadRequest("Le bien sp√©cifi√© n'existe pas.");
+                }
+
+                if (!createDto.QuantiteConso.HasValue || createDto.QuantiteConso <= 0)
+                {
+                    return BadRequest("La consommation doit √™tre un nombre positif.");
+                }
+
+                if (immobilisation.Quantite < createDto.QuantiteConso)
+                {
+                    return BadRequest("La consommation d√©passe le stock disponible.");
+                }
+
+                var existing = await _context.BienAgences
+                    .FirstOrDefaultAsync(ba => ba.IdAgence == createDto.AgenceId && ba.IdBien == createDto.BienId);
+
+                int resultIdBien, resultIdAgence;
+                if (existing != null)
+                {
+                    if (existing.Quantite < createDto.QuantiteConso)
+                    {
+                        return BadRequest("La consommation d√©passe la quantit√© disponible dans l'agence.");
+                    }
+                    existing.Quantite = Math.Max(0, (existing.Quantite ?? 0) - (int)createDto.QuantiteConso.Value);
+                    existing.QuantiteConso = createDto.QuantiteConso;
+                    existing.DateAffectation = DateTime.Now;
+                    _context.BienAgences.Update(existing);
+                    resultIdBien = existing.IdBien;
+                    resultIdAgence = existing.IdAgence;
+                }
+                else
+                {
+                    var bienAgence = new BienAgence
+                    {
+                        IdAgence = createDto.AgenceId,
+                        IdBien = createDto.BienId,
+                        Quantite = 0,
+                        QuantiteConso = createDto.QuantiteConso,
+                        DateAffectation = DateTime.Now
+                    };
+                    _context.BienAgences.Add(bienAgence);
+                    resultIdBien = bienAgence.IdBien;
+                    resultIdAgence = bienAgence.IdAgence;
+                }
+
+                immobilisation.Quantite -= (int)createDto.QuantiteConso.Value;
+                _context.Immobilisations.Update(immobilisation);
+
+                await _context.SaveChangesAsync();
+
+                var result = await _context.BienAgences
+                    .Include(ba => ba.Agence)
+                    .Include(ba => ba.Immobilisation)
+                    .ThenInclude(i => i.Categorie)
+                    .Where(ba => ba.IdBien == resultIdBien && ba.IdAgence == resultIdAgence)
+                    .Select(ba => new BienAgenceDto
+                    {
+                        IdBien = ba.IdBien,
+                        IdAgence = ba.IdAgence,
+                        NomBien = ba.Immobilisation != null ? ba.Immobilisation.NomBien : "Bien inconnu",
+                        NomAgence = ba.Agence != null ? ba.Agence.Nom : "Agence inconnue",
+                        Categorie = ba.Immobilisation != null && ba.Immobilisation.Categorie != null ? ba.Immobilisation.Categorie.NomCategorie : "Non cat√©goris√©",
+                        Quantite = ba.Quantite ?? 0,
+                        QuantiteConso = ba.QuantiteConso,
+                        DateAffectation = ba.DateAffectation,
+                        Immobilisation = _mapper.Map<ImmobilisationDto>(ba.Immobilisation),
+                        Agence = _mapper.Map<AgenceDto>(ba.Agence)
+                    })
+                    .FirstOrDefaultAsync();
+
+                if (result == null)
+                {
+                    return NotFound("Erreur lors de la r√©cup√©ration de la consommation.");
+                }
+
+                return CreatedAtAction(nameof(GetBienAgence), new { idBien = result.IdBien, idAgence = result.IdAgence }, result);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Erreur dans CreateConsommation: {ex.Message}");
+                return StatusCode(500, "Erreur lors de la cr√©ation de la consommation.");
+            }
+        }
+
+        // POST: api/BienAgences/Consommation/Add
+        [HttpPost("Consommation/Add")]
+        public async Task<ActionResult<BienAgenceDto>> AddConsommation([FromBody] ConsommationBienCreateDto createDto)
+        {
+            try
+            {
+                var existing = await _context.BienAgences
+                    .FirstOrDefaultAsync(ba => ba.IdAgence == createDto.AgenceId && ba.IdBien == createDto.BienId);
+                if (existing == null)
+                {
+                    return NotFound("Aucune association existante pour cette agence et ce bien.");
+                }
+
+                var immobilisation = await _context.Immobilisations
+                    .Include(i => i.Categorie)
+                    .FirstOrDefaultAsync(i => i.IdBien == createDto.BienId);
+                if (immobilisation == null)
+                {
+                    return BadRequest("Le bien sp√©cifi√© n'existe pas.");
+                }
+
+                if (!createDto.QuantiteConso.HasValue || createDto.QuantiteConso <= 0)
+                {
+                    return BadRequest("La consommation doit √™tre un nombre positif.");
+                }
+
+                if (existing.Quantite < createDto.QuantiteConso)
+                {
+                    return BadRequest("La consommation d√©passe la quantit√© disponible dans l'agence.");
+                }
+
+                if (immobilisation.Quantite < createDto.QuantiteConso)
+                {
+                    return BadRequest("La consommation d√©passe le stock restant.");
+                }
+
+                existing.Quantite = Math.Max(0, (existing.Quantite ?? 0) - (int)createDto.QuantiteConso.Value);
+                existing.QuantiteConso = createDto.QuantiteConso;
+                existing.DateAffectation = DateTime.Now;
+                _context.BienAgences.Update(existing);
+
+                immobilisation.Quantite -= (int)createDto.QuantiteConso.Value;
+                _context.Immobilisations.Update(immobilisation);
+
+                await _context.SaveChangesAsync();
+
+                var result = await _context.BienAgences
+                    .Include(ba => ba.Agence)
+                    .Include(ba => ba.Immobilisation)
+                    .ThenInclude(i => i.Categorie)
+                    .Where(ba => ba.IdBien == existing.IdBien && ba.IdAgence == existing.IdAgence)
+                    .Select(ba => new BienAgenceDto
+                    {
+                        IdBien = ba.IdBien,
+                        IdAgence = ba.IdAgence,
+                        NomBien = ba.Immobilisation != null ? ba.Immobilisation.NomBien : "Bien inconnu",
+                        NomAgence = ba.Agence != null ? ba.Agence.Nom : "Agence inconnue",
+                        Categorie = ba.Immobilisation != null && ba.Immobilisation.Categorie != null ? ba.Immobilisation.Categorie.NomCategorie : "Non cat√©goris√©",
+                        Quantite = ba.Quantite ?? 0,
+                        QuantiteConso = ba.QuantiteConso,
+                        DateAffectation = ba.DateAffectation,
+                        Immobilisation = _mapper.Map<ImmobilisationDto>(ba.Immobilisation),
+                        Agence = _mapper.Map<AgenceDto>(ba.Agence)
+                    })
+                    .FirstOrDefaultAsync();
+
+                if (result == null)
+                {
+                    return NotFound("Erreur lors de la r√©cup√©ration de la consommation mise √† jour.");
+                }
+
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Erreur dans AddConsommation: {ex.Message}");
+                return StatusCode(500, "Erreur lors de l'ajout de la consommation.");
             }
         }
 
@@ -182,15 +446,14 @@ namespace GestionFournituresAPI.Controllers
 
                 if (bienAgence == null)
                 {
-                    Console.WriteLine($"Affectation non trouvÈe pour suppression: IdBien={idBien}, IdAgence={idAgence}, Date={date}");
-                    return NotFound("Affectation non trouvÈe.");
+                    Console.WriteLine($"Affectation non trouv√©e pour suppression: IdBien={idBien}, IdAgence={idAgence}, Date={date}");
+                    return NotFound("Affectation non trouv√©e.");
                 }
 
-                // Restaurer la quantitÈ dans Immobilisations si Quantite existe
                 if (bienAgence.Quantite.HasValue && bienAgence.Immobilisation != null)
                 {
                     bienAgence.Immobilisation.Quantite += bienAgence.Quantite.Value;
-                    Console.WriteLine($"QuantitÈ restaurÈe dans Immobilisations: {bienAgence.Immobilisation.Quantite}");
+                    Console.WriteLine($"Quantit√© restaur√©e dans Immobilisations: {bienAgence.Immobilisation.Quantite}");
                 }
 
                 _context.BienAgences.Remove(bienAgence);
