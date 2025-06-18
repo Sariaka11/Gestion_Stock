@@ -17,13 +17,14 @@ namespace GestionFournituresAPI.Data
         public DbSet<AgenceFourniture> AgenceFournitures { get; set; } = null!;
         public DbSet<UserAgence> UserAgences { get; set; } = null!;
         public DbSet<UserFourniture> UserFournitures { get; set; } = null!;
-        public DbSet<EntreeFourniture> EntreeFournitures { get; set; }
+        public DbSet<EntreeFourniture> EntreeFournitures { get; set; } = null!;
 
         // Nouvelles tables pour la gestion de l'immobilier
         public DbSet<Categorie> Categories { get; set; } = null!;
         public DbSet<Immobilisation> Immobilisations { get; set; } = null!;
         public DbSet<Amortissement> Amortissements { get; set; } = null!;
         public DbSet<BienAgence> BienAgences { get; set; } = null!;
+        public DbSet<Notification> Notifications { get; set; } = null!;
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -40,7 +41,7 @@ namespace GestionFournituresAPI.Data
 
             // Configuration de la relation many-to-many entre Agence et Fourniture
             modelBuilder.Entity<AgenceFourniture>()
-                .HasKey(af => new { af.AgenceId, af.FournitureId });
+                .HasKey(af => af.Id);
 
             modelBuilder.Entity<AgenceFourniture>()
                 .HasOne(af => af.Agence)
@@ -61,13 +62,6 @@ namespace GestionFournituresAPI.Data
                 .WithMany(u => u.UserAgences)
                 .HasForeignKey(ua => ua.UserId);
 
-            modelBuilder.Entity<UserAgence>(entity =>
-            {
-                entity.HasKey(e => e.Id);
-                entity.Property(e => e.Id)
-                      .ValueGeneratedOnAdd(); // Pour auto-increment
-            });
-
             modelBuilder.Entity<UserAgence>()
                 .HasOne(ua => ua.Agence)
                 .WithMany(a => a.UserAgences)
@@ -87,15 +81,12 @@ namespace GestionFournituresAPI.Data
                 .WithMany(f => f.UserFournitures)
                 .HasForeignKey(uf => uf.FournitureId);
 
+            // Relation entre Immobilisation et Categorie
             modelBuilder.Entity<Immobilisation>()
-                  .HasMany(i => i.Amortissements)
-                  .WithOne(a => a.Immobilisation)
-                  .HasForeignKey(a => a.IdBien);
-
-            //modelBuilder.Entity<Immobilisation>()
-            //    .HasOne(i => i.Categorie)
-            //    .WithMany()
-            //    .HasForeignKey(i => i.IdCategorie);
+                .HasOne(i => i.Categorie)
+                .WithMany(c => c.Immobilisations)
+                .HasForeignKey(i => i.IdCategorie)
+                .OnDelete(DeleteBehavior.SetNull);
 
             // Relation entre Amortissement et Immobilisation
             modelBuilder.Entity<Amortissement>()
@@ -103,42 +94,80 @@ namespace GestionFournituresAPI.Data
                 .WithMany(i => i.Amortissements)
                 .HasForeignKey(a => a.IdBien);
 
-            // Contrainte d'unicité pour Amortissement (un seul amortissement par bien et par année)
+            // Contrainte d'unicité pour Amortissement
             modelBuilder.Entity<Amortissement>()
                 .HasIndex(a => new { a.IdBien, a.Annee })
                 .IsUnique();
 
             // Clé primaire composite pour BienAgence
             modelBuilder.Entity<BienAgence>()
-                .HasKey(ba => new { ba.IdBien, ba.IdAgence, ba.DateAffectation });
+                .HasKey(ba => new { ba.IdAgence, ba.IdBien });
 
             // Relations pour BienAgence
-            modelBuilder.Entity<BienAgence>()
-                .HasOne(ba => ba.Immobilisation)
-                .WithMany(i => i.BienAgences)
-                .HasForeignKey(ba => ba.IdBien);
-
             modelBuilder.Entity<BienAgence>()
                 .HasOne(ba => ba.Agence)
                 .WithMany(a => a.BienAgences)
                 .HasForeignKey(ba => ba.IdAgence);
 
+            modelBuilder.Entity<BienAgence>()
+                .HasOne(ba => ba.Immobilisation)
+                .WithMany(i => i.BienAgences)
+                .HasForeignKey(ba => ba.IdBien);
+
+            modelBuilder.Entity<Notification>(entity =>
+                {
+                    // Spécifier explicitement le nom de la table en majuscules
+                    entity.ToTable("NOTIFICATIONS");
+                    
+                    // Mapper explicitement les colonnes
+                    entity.Property(e => e.Id).HasColumnName("ID");
+                    entity.Property(e => e.UserId).HasColumnName("USER_ID");
+                    entity.Property(e => e.AgenceId).HasColumnName("AGENCE_ID");
+                    entity.Property(e => e.FournitureId).HasColumnName("FOURNITURE_ID");
+                    entity.Property(e => e.BienId).HasColumnName("BIEN_ID");
+                    entity.Property(e => e.Titre).HasColumnName("TITRE");
+                    entity.Property(e => e.Corps).HasColumnName("CORPS");
+                    entity.Property(e => e.DateDemande).HasColumnName("DATE_DEMANDE");
+                    entity.Property(e => e.Statut).HasColumnName("STATUT");
+                    
+                    // Ignorer UserName s'il n'est pas dans la DB
+                    entity.Ignore(e => e.UserName);
+                });
+
+            // Configuration pour Notification
+            modelBuilder.Entity<Notification>()
+                .HasOne(n => n.Agence)
+                .WithMany(a => a.Notifications)
+                .HasForeignKey(n => n.AgenceId);
+
+            modelBuilder.Entity<Notification>()
+                .HasOne(n => n.Fourniture)
+                .WithMany(f => f.Notifications)
+                .HasForeignKey(n => n.FournitureId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            modelBuilder.Entity<Notification>()
+                .HasOne(n => n.Immobilisation)
+                .WithMany(i => i.Notifications)
+                .HasForeignKey(n => n.BienId)
+                .OnDelete(DeleteBehavior.SetNull);
+
             // Configuration pour gérer les valeurs NULL dans Oracle
             modelBuilder.Entity<Immobilisation>()
                 .Property(i => i.IdCategorie)
-                .IsRequired(false); // Marquer explicitement comme nullable
+                .IsRequired(false);
 
             modelBuilder.Entity<Immobilisation>()
                 .Property(i => i.Quantite)
-                .IsRequired(false); // Marquer explicitement comme nullable
+                .IsRequired(false);
 
             modelBuilder.Entity<Immobilisation>()
                 .Property(i => i.DateAcquisition)
-                .IsRequired(false); // Marquer explicitement comme nullable
+                .IsRequired(false);
 
             modelBuilder.Entity<Immobilisation>()
                 .Property(i => i.Statut)
-                .IsRequired(false); // Marquer explicitement comme nullable
+                .IsRequired(false);
         }
     }
 }

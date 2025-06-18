@@ -18,9 +18,10 @@ namespace GestionFournituresAPI.Dtos
 
     public class ConsommationBienCreateDto
     {
+        
         public int AgenceId { get; set; }
         public int BienId { get; set; }
         public decimal? QuantiteConso { get; set; }
         public DateTime DateAffectation { get; set; }
-    }
+     }
 }

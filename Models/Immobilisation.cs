@@ -1,5 +1,6 @@
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
+using System.Collections.Generic;
 
 namespace GestionFournituresAPI.Models
 {
@@ -45,7 +46,9 @@ namespace GestionFournituresAPI.Models
 
         public virtual ICollection<BienAgence>? BienAgences { get; set; }
 
-        // Propriétés calculées
+        public virtual ICollection<Notification>? Notifications { get; set; }
+
+        // PropriÃ©tÃ©s calculÃ©es
         [NotMapped]
         public decimal ValeurNetteComptable { get; set; }
 

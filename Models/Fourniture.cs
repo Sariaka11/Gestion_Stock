@@ -1,5 +1,6 @@
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
+using System.Collections.Generic;
 
 namespace GestionFournituresAPI.Models
 {
@@ -13,7 +14,7 @@ namespace GestionFournituresAPI.Models
         [Required]
         [Column("NOM")]
         [StringLength(100)]
-        public string Nom { get; set; } = string.Empty;
+        public string? Nom { get; set; } = string.Empty;
 
         [Required]
         [Column("PRIX_UNITAIRE", TypeName = "decimal(18,2)")]
@@ -26,24 +27,25 @@ namespace GestionFournituresAPI.Models
         [Required]
         [Column("CATEGORIE")]
         [StringLength(100)]
-        public string Categorie { get; set; } = string.Empty;
+        public string? Categorie { get; set; } = string.Empty;
 
         // Ajout des propriétés de navigation
         public virtual ICollection<EntreeFourniture> EntreesFournitures { get; set; } = new List<EntreeFourniture>();
         public virtual ICollection<AgenceFourniture> AgenceFournitures { get; set; } = new List<AgenceFourniture>();
         public virtual ICollection<UserFourniture> UserFournitures { get; set; } = new List<UserFourniture>();
+        public virtual ICollection<Notification> Notifications { get; set; } = new List<Notification>();
 
         // Propriétés calculées (non stockées en base de données)
         [NotMapped]
         public decimal CMUP { get; set; }
 
         [NotMapped]
-        public int Quantite { get; set; } // Quantité totale des entrées (calculée)
+        public int Quantite { get; set; }
 
         [NotMapped]
-        public decimal Montant { get; set; } // Montant total des entrées (calculé)
+        public decimal Montant { get; set; }
 
         [NotMapped]
-        public decimal PrixTotal { get; set; } // Prix total basé sur la quantité restante (calculé)
+        public decimal PrixTotal { get; set; }
     }
 }
