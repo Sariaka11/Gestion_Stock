@@ -70,7 +70,7 @@ namespace GestionFournituresAPI.Controllers
                 }
 
                 var existingAffectation = await _context.BienAgences
-                    .FirstOrDefaultAsync(ba => ba.IdBien == dto.IdBien && ba.IdAgence == dto.IdAgence);
+                  .FirstOrDefaultAsync(ba => ba.IdBien == dto.IdBien && ba.IdAgence == dto.IdAgence && ba.DateAffectation.Date == dto.DateAffectation.Date);
 
                 BienAgence bienAgence;
                 if (existingAffectation != null)
