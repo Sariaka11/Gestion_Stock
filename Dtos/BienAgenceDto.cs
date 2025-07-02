@@ -11,6 +11,8 @@ namespace GestionFournituresAPI.Dtos
         public string? Categorie { get; set; }
         public int? Quantite { get; set; }
         public decimal? QuantiteConso { get; set; }
+        public string? Fonction { get; set; } // Nouvelle propriété
+        
         public DateTime DateAffectation { get; set; }
         public ImmobilisationDto? Immobilisation { get; set; }
         public AgenceDto? Agence { get; set; }
