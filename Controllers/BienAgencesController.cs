@@ -22,10 +22,10 @@ namespace GestionFournituresAPI.Controllers
             _context = context;
             _mapper = mapper;
         }
+
         [HttpPost]
         public async Task<IActionResult> PostBienAgence(BienAgenceDto dto)
         {
-            // Utiliser une transaction pour éviter les problèmes de concurrence
             using var transaction = await _context.Database.BeginTransactionAsync();
 
             try
@@ -42,14 +42,12 @@ namespace GestionFournituresAPI.Controllers
                     return BadRequest("La quantité doit être un nombre positif.");
                 }
 
-                // Utiliser la date d'aujourd'hui si aucune date n'est fournie
                 if (dto.DateAffectation == default)
                 {
                     dto.DateAffectation = DateTime.Today;
                     Console.WriteLine($"DateAffectation définie à : {dto.DateAffectation:dd/MM/yy}");
                 }
 
-                // Vérifier l'existence de l'immobilisation avec un lock pour éviter les conflits
                 var immobilisation = await _context.Immobilisations
                     .Include(i => i.Categorie)
                     .FirstOrDefaultAsync(i => i.IdBien == dto.IdBien);
@@ -66,7 +64,6 @@ namespace GestionFournituresAPI.Controllers
                     return BadRequest("Quantité insuffisante en stock.");
                 }
 
-                // Vérifier l'existence de l'agence
                 var agence = await _context.Agences.FirstOrDefaultAsync(a => a.Id == dto.IdAgence);
                 if (agence == null)
                 {
@@ -74,9 +71,6 @@ namespace GestionFournituresAPI.Controllers
                     return BadRequest($"L'agence avec l'ID {dto.IdAgence} n'existe pas.");
                 }
 
-                // CORRECTION 1: Rechercher l'affectation existante avec les mêmes ID_BIEN, ID_AGENCE et DATE_AFFECTATION
-                // Car la clé primaire est (ID_BIEN, ID_AGENCE, DATE_AFFECTATION) - pas la fonction !
-                // IMPORTANT: Utiliser le tracking pour permettre la mise à jour
                 var existingAffectation = await _context.BienAgences
                     .FirstOrDefaultAsync(ba => ba.IdBien == dto.IdBien &&
                                              ba.IdAgence == dto.IdAgence &&
@@ -94,31 +88,21 @@ namespace GestionFournituresAPI.Controllers
 
                 if (existingAffectation != null)
                 {
-                    // CORRECTION 3: Mise à jour de l'affectation existante
-                    // Si même date mais fonction différente, on met à jour la fonction ET on cumule la quantité
                     Console.WriteLine($"Mise à jour de l'affectation existante: ancienne fonction={existingAffectation.Fonction}, nouvelle fonction={dto.Fonction}, ancienne quantité={existingAffectation.Quantite}");
 
-                    // Cumul de la quantité
                     existingAffectation.Quantite += dto.Quantite.Value;
-
-                    // Mise à jour de la fonction vers la nouvelle fonction
                     existingAffectation.Fonction = dto.Fonction;
 
-                    // Mise à jour de QuantiteConso si fournie
                     if (dto.QuantiteConso.HasValue)
                     {
                         existingAffectation.QuantiteConso = dto.QuantiteConso.Value;
                     }
-
-                    // PAS BESOIN de marquer comme Modified car l'entité est déjà trackée
-                    // _context.Entry(existingAffectation).State = EntityState.Modified;
 
                     bienAgence = existingAffectation;
                     Console.WriteLine($"Nouvelle quantité après mise à jour: {existingAffectation.Quantite}, nouvelle fonction: {existingAffectation.Fonction}");
                 }
                 else
                 {
-                    // CORRECTION 4: Créer une nouvelle affectation
                     Console.WriteLine($"Création d'une nouvelle affectation: ID_BIEN={dto.IdBien}, ID_AGENCE={dto.IdAgence}, FONCTION={dto.Fonction}");
 
                     bienAgence = new BienAgence
@@ -134,21 +118,14 @@ namespace GestionFournituresAPI.Controllers
                     _context.BienAgences.Add(bienAgence);
                 }
 
-                // CORRECTION 5: Mettre à jour le stock de l'immobilisation
                 immobilisation.Quantite -= dto.Quantite.Value;
-                // PAS BESOIN de marquer comme Modified car l'entité est déjà trackée
-                // _context.Entry(immobilisation).State = EntityState.Modified;
-
                 Console.WriteLine($"Nouvelle quantité dans Immobilisations: {immobilisation.Quantite}");
 
-                // CORRECTION 6: Sauvegarder les changements dans la transaction
                 var saveResult = await _context.SaveChangesAsync();
                 Console.WriteLine($"SaveChangesAsync a affecté {saveResult} ligne(s).");
 
-                // Valider la transaction
                 await transaction.CommitAsync();
 
-                // CORRECTION 7: Récupérer les données mises à jour après commit
                 var affectationResult = await _context.BienAgences
                     .AsNoTracking()
                     .Include(ba => ba.Immobilisation)
@@ -174,7 +151,7 @@ namespace GestionFournituresAPI.Controllers
                     Categorie = affectationResult.Immobilisation?.Categorie?.NomCategorie ?? "Non catégorisé",
                     Quantite = affectationResult.Quantite,
                     QuantiteConso = affectationResult.QuantiteConso,
-                    Fonction = affectationResult.Fonction,
+                    Fonction = affectationResult.Fonction ?? "Non spécifié",
                     DateAffectation = affectationResult.DateAffectation,
                     Immobilisation = affectationResult.Immobilisation != null ? _mapper.Map<ImmobilisationDto>(affectationResult.Immobilisation) : null,
                     Agence = affectationResult.Agence != null ? _mapper.Map<AgenceDto>(affectationResult.Agence) : null
@@ -202,8 +179,7 @@ namespace GestionFournituresAPI.Controllers
             }
         }
 
-        // GET: api/BienAgences
- [HttpGet]
+        [HttpGet]
         public async Task<IActionResult> GetBienAgences()
         {
             try
@@ -260,7 +236,6 @@ namespace GestionFournituresAPI.Controllers
             }
         }
 
-        // GET: api/BienAgences/Bien/5/Agence/3
         [HttpGet("Bien/{idBien}/Agence/{idAgence}")]
         public async Task<IActionResult> GetBienAgence(int idBien, int idAgence)
         {
@@ -289,6 +264,7 @@ namespace GestionFournituresAPI.Controllers
                     Quantite = ba.Quantite,
                     QuantiteConso = ba.QuantiteConso,
                     DateAffectation = ba.DateAffectation,
+                    Fonction = ba.Fonction ?? "Non spécifié",
                     Immobilisation = ba.Immobilisation != null ? _mapper.Map<ImmobilisationDto>(ba.Immobilisation) : null,
                     Agence = ba.Agence != null ? _mapper.Map<AgenceDto>(ba.Agence) : null
                 }).ToList();
@@ -301,7 +277,6 @@ namespace GestionFournituresAPI.Controllers
             }
         }
 
-        // GET: api/BienAgences/ByAgence/2
         [HttpGet("ByAgence/{agenceId}")]
         public async Task<IActionResult> GetBienByAgence(int agenceId)
         {
@@ -329,7 +304,7 @@ namespace GestionFournituresAPI.Controllers
                     Categorie = ba.Immobilisation != null && ba.Immobilisation.Categorie != null ? ba.Immobilisation.Categorie.NomCategorie : "Non catégorisé",
                     Quantite = ba.Quantite,
                     QuantiteConso = ba.QuantiteConso,
-                     Fonction = ba.Fonction,
+                    Fonction = ba.Fonction ?? "Non spécifié",
                     DateAffectation = ba.DateAffectation,
                     Immobilisation = ba.Immobilisation != null ? _mapper.Map<ImmobilisationDto>(ba.Immobilisation) : null,
                     Agence = ba.Agence != null ? _mapper.Map<AgenceDto>(ba.Agence) : null
@@ -343,7 +318,6 @@ namespace GestionFournituresAPI.Controllers
             }
         }
 
-        // POST: api/BienAgences/Consommation
         [HttpPost("Consommation")]
         public async Task<ActionResult<BienAgenceDto>> CreateConsommation([FromBody] ConsommationBienCreateDto createDto)
         {
@@ -459,6 +433,7 @@ namespace GestionFournituresAPI.Controllers
                     Quantite = result.Quantite,
                     QuantiteConso = result.QuantiteConso,
                     DateAffectation = result.DateAffectation,
+                    Fonction = result.Fonction ?? "Non spécifié",
                     Immobilisation = result.Immobilisation != null ? _mapper.Map<ImmobilisationDto>(result.Immobilisation) : null,
                     Agence = result.Agence != null ? _mapper.Map<AgenceDto>(result.Agence) : null
                 };
@@ -473,116 +448,157 @@ namespace GestionFournituresAPI.Controllers
             }
         }
 
-        // POST: api/BienAgences/Consommation/Add
-        [HttpPost("Consommation/Add")]
-        public async Task<ActionResult<BienAgenceDto>> AddConsommation([FromBody] ConsommationBienCreateDto createDto)
+      [HttpPost("Consommation/Add")]
+public async Task<ActionResult<BienAgenceDto>> AddConsommation([FromBody] ConsommationBienCreateDto createDto)
+{
+    try
+    {
+        Console.WriteLine($"Requête reçue pour AddConsommation: {System.Text.Json.JsonSerializer.Serialize(createDto)}");
+
+        if (!ModelState.IsValid)
         {
-            try
+            var errors = ModelState.Values.SelectMany(v => v.Errors).Select(e => e.ErrorMessage);
+            Console.WriteLine($"ModelState invalide: {string.Join("; ", errors)}");
+            return BadRequest(ModelState);
+        }
+
+        // Vérification s'il y a des doublons
+        var existingRecords = await _context.BienAgences
+            .Where(ba => ba.IdAgence == createDto.AgenceId && ba.IdBien == createDto.BienId)
+            .ToListAsync();
+
+        Console.WriteLine($"Nombre d'enregistrements trouvés: {existingRecords.Count}");
+        
+        if (existingRecords.Count == 0)
+        {
+            Console.WriteLine($"Aucune affectation trouvée pour AgenceId={createDto.AgenceId}, BienId={createDto.BienId}");
+            return NotFound("Aucune association existante pour cette agence et ce bien.");
+        }
+
+        if (existingRecords.Count > 1)
+        {
+            Console.WriteLine($"Plusieurs enregistrements trouvés ({existingRecords.Count}) pour AgenceId={createDto.AgenceId}, BienId={createDto.BienId}");
+            foreach (var record in existingRecords)
             {
-                Console.WriteLine($"Requête reçue pour AddConsommation: {System.Text.Json.JsonSerializer.Serialize(createDto)}");
-
-                if (!ModelState.IsValid)
-                {
-                    var errors = ModelState.Values.SelectMany(v => v.Errors).Select(e => e.ErrorMessage);
-                    Console.WriteLine($"ModelState invalide: {string.Join("; ", errors)}");
-                    return BadRequest(ModelState);
-                }
-
-                // Vérifier l'existence de l'affectation
-                var existing = await _context.BienAgences
-                    .AsNoTracking()
-                    .FirstOrDefaultAsync(ba => ba.IdAgence == createDto.AgenceId && ba.IdBien == createDto.BienId);
-                if (existing == null)
-                {
-                    Console.WriteLine($"Aucune affectation trouvée pour AgenceId={createDto.AgenceId}, BienId={createDto.BienId}");
-                    return NotFound("Aucune association existante pour cette agence et ce bien.");
-                }
-
-                // Vérifier l'immobilisation
-                var immobilisation = await _context.Immobilisations
-                    .FirstOrDefaultAsync(i => i.IdBien == createDto.BienId);
-                if (immobilisation == null)
-                {
-                    Console.WriteLine($"Immobilisation non trouvée: Id={createDto.BienId}");
-                    return BadRequest("Le bien spécifié n'existe pas.");
-                }
-
-                // Valider QuantiteConso
-                if (!createDto.QuantiteConso.HasValue || createDto.QuantiteConso <= 0)
-                {
-                    Console.WriteLine($"QuantiteConso invalide: {createDto.QuantiteConso}");
-                    return BadRequest("La consommation doit être un nombre positif.");
-                }
-
-                // Vérifier les quantités disponibles
-                if (existing.Quantite < createDto.QuantiteConso)
-                {
-                    Console.WriteLine($"Quantité insuffisante dans l'affectation: Quantite={existing.Quantite}, Demandé={createDto.QuantiteConso}");
-                    return BadRequest("La consommation dépasse la quantité disponible dans l'agence.");
-                }
-                if (immobilisation.Quantite < createDto.QuantiteConso)
-                {
-                    Console.WriteLine($"Stock insuffisant: Quantite={immobilisation.Quantite}, Demandé={createDto.QuantiteConso}");
-                    return BadRequest("La consommation dépasse le stock restant.");
-                }
-
-                // Mettre à jour l'affectation
-                existing.Quantite = Math.Max(0, (existing.Quantite ?? 0) - (int)createDto.QuantiteConso.Value);
-                existing.QuantiteConso = (existing.QuantiteConso ?? 0) + createDto.QuantiteConso;
-                existing.DateAffectation = createDto.DateAffectation != default ? createDto.DateAffectation : DateTime.Now;
-                _context.BienAgences.Update(existing);
-
-                // Mettre à jour le stock
-                immobilisation.Quantite -= (int)createDto.QuantiteConso.Value;
-                _context.Immobilisations.Update(immobilisation);
-
-                await _context.SaveChangesAsync();
-                Console.WriteLine($"Mise à jour effectuée: IdBien={existing.IdBien}, IdAgence={existing.IdAgence}");
-
-                // Récupérer le résultat
-                var result = await _context.BienAgences
-                    .Include(ba => ba.Agence)
-                    .Include(ba => ba.Immobilisation)
-                    .ThenInclude(i => i.Categorie)
-                    .FirstOrDefaultAsync(ba => ba.IdBien == existing.IdBien && ba.IdAgence == existing.IdAgence);
-
-                if (result == null)
-                {
-                    Console.WriteLine("Erreur: Résultat non trouvé après sauvegarde.");
-                    return NotFound("Erreur lors de la récupération de la consommation mise à jour.");
-                }
-
-                var resultDto = new BienAgenceDto
-                {
-                    IdBien = result.IdBien,
-                    IdAgence = result.IdAgence,
-                    NomBien = result.Immobilisation?.NomBien ?? "Bien inconnu",
-                    NomAgence = result.Agence?.Nom ?? "Agence inconnue",
-                    Categorie = result.Immobilisation?.Categorie?.NomCategorie ?? "Non catégorisé",
-                    Quantite = result.Quantite ?? 0,
-                    QuantiteConso = result.QuantiteConso,
-                    DateAffectation = result.DateAffectation,
-                    Immobilisation = result.Immobilisation != null ? _mapper.Map<ImmobilisationDto>(result.Immobilisation) : null,
-                    Agence = result.Agence != null ? _mapper.Map<AgenceDto>(result.Agence) : null
-                };
-
-                Console.WriteLine($"Résultat retourné: IdBien={resultDto.IdBien}, IdAgence={resultDto.IdAgence}");
-                return Ok(resultDto);
+                Console.WriteLine($"  - ID_BIEN: {record.IdBien}, ID_AGENCE: {record.IdAgence}, DATE_AFFECTATION: {record.DateAffectation}");
             }
-            catch (DbUpdateException ex)
+            
+            // Prendre l'enregistrement le plus récent ou celui avec la plus grande quantité
+            var targetRecord = existingRecords
+                .OrderByDescending(ba => ba.DateAffectation)
+                .ThenByDescending(ba => ba.Quantite)
+                .FirstOrDefault();
+            
+            Console.WriteLine($"Enregistrement sélectionné: DATE_AFFECTATION={targetRecord.DateAffectation}, QUANTITE={targetRecord.Quantite}");
+            
+            // Utiliser une requête spécifique avec tous les champs de la clé primaire
+            var existing = await _context.BienAgences
+                .FirstOrDefaultAsync(ba => ba.IdAgence == createDto.AgenceId && 
+                                          ba.IdBien == createDto.BienId && 
+                                          ba.DateAffectation == targetRecord.DateAffectation);
+            
+            if (existing == null)
             {
-                Console.WriteLine($"Erreur de base de données dans AddConsommation: {ex.InnerException?.Message}\nStackTrace: {ex.StackTrace}");
-                return StatusCode(500, $"Erreur serveur: {ex.InnerException?.Message ?? ex.Message}");
+                Console.WriteLine("Erreur: Enregistrement spécifique non trouvé");
+                return NotFound("Enregistrement spécifique non trouvé.");
             }
-            catch (Exception ex)
+            
+            return await ProcessConsommation(existing, createDto);
+        }
+        else
+        {
+            // Cas normal : un seul enregistrement
+            return await ProcessConsommation(existingRecords.First(), createDto);
+        }
+    }
+    catch (DbUpdateException ex)
+    {
+        Console.WriteLine($"Erreur de base de données dans AddConsommation: {ex.InnerException?.Message}\nStackTrace: {ex.StackTrace}");
+        return StatusCode(500, $"Erreur serveur: {ex.InnerException?.Message ?? ex.Message}");
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"Erreur dans AddConsommation: {ex.Message}\nStackTrace: {ex.StackTrace}\nInnerException: {ex.InnerException?.Message}");
+        return StatusCode(500, $"Erreur lors de l'ajout de la consommation: {ex.Message}");
+    }
+}
+
+        private async Task<ActionResult<BienAgenceDto>> ProcessConsommation(BienAgence existing, ConsommationBienCreateDto createDto)
+        {
+            var immobilisation = await _context.Immobilisations
+                .FirstOrDefaultAsync(i => i.IdBien == createDto.BienId);
+
+            if (immobilisation == null)
             {
-                Console.WriteLine($"Erreur dans AddConsommation: {ex.Message}\nStackTrace: {ex.StackTrace}\nInnerException: {ex.InnerException?.Message}");
-                return StatusCode(500, $"Erreur lors de l'ajout de la consommation: {ex.Message}");
+                Console.WriteLine($"Immobilisation non trouvée: Id={createDto.BienId}");
+                return BadRequest("Le bien spécifié n'existe pas.");
             }
+
+            if (!createDto.QuantiteConso.HasValue || createDto.QuantiteConso <= 0)
+            {
+                Console.WriteLine($"QuantiteConso invalide: {createDto.QuantiteConso}");
+                return BadRequest("La consommation doit être un nombre positif.");
+            }
+
+            // Vérification des quantités disponibles
+            if (existing.Quantite < createDto.QuantiteConso)
+            {
+                Console.WriteLine($"Quantité insuffisante dans l'affectation: Quantite={existing.Quantite}, Demandé={createDto.QuantiteConso}");
+                return BadRequest("La consommation dépasse la quantité disponible dans l'agence.");
+            }
+
+            if (immobilisation.Quantite < createDto.QuantiteConso)
+            {
+                Console.WriteLine($"Stock insuffisant: Quantite={immobilisation.Quantite}, Demandé={createDto.QuantiteConso}");
+                return BadRequest("La consommation dépasse le stock restant.");
+            }
+
+            // Mise à jour des quantités
+            existing.Quantite = Math.Max(0, (existing.Quantite ?? 0) - (int)createDto.QuantiteConso.Value);
+            existing.QuantiteConso = (existing.QuantiteConso ?? 0) + createDto.QuantiteConso.Value;
+
+            // Mise à jour de l'immobilisation
+            immobilisation.Quantite -= (int)createDto.QuantiteConso.Value;
+
+            // Sauvegarde des modifications
+            await _context.SaveChangesAsync();
+            Console.WriteLine($"Mise à jour effectuée: IdBien={existing.IdBien}, IdAgence={existing.IdAgence}");
+
+            // Récupération du résultat avec les relations
+            var result = await _context.BienAgences
+                .Include(ba => ba.Agence)
+                .Include(ba => ba.Immobilisation)
+                .ThenInclude(i => i.Categorie)
+                .FirstOrDefaultAsync(ba => ba.IdBien == existing.IdBien &&
+                                          ba.IdAgence == existing.IdAgence &&
+                                          ba.DateAffectation == existing.DateAffectation);
+
+            if (result == null)
+            {
+                Console.WriteLine("Erreur: Résultat non trouvé après sauvegarde.");
+                return NotFound("Erreur lors de la récupération de la consommation mise à jour.");
+            }
+
+            var resultDto = new BienAgenceDto
+            {
+                IdBien = result.IdBien,
+                IdAgence = result.IdAgence,
+                NomBien = result.Immobilisation?.NomBien ?? "Bien inconnu",
+                NomAgence = result.Agence?.Nom ?? "Agence inconnue",
+                Categorie = result.Immobilisation?.Categorie?.NomCategorie ?? "Non catégorisé",
+                Quantite = result.Quantite ?? 0,
+                QuantiteConso = result.QuantiteConso,
+                DateAffectation = result.DateAffectation,
+                Fonction = result.Fonction ?? "Non spécifié",
+                Immobilisation = result.Immobilisation != null ? _mapper.Map<ImmobilisationDto>(result.Immobilisation) : null,
+                Agence = result.Agence != null ? _mapper.Map<AgenceDto>(result.Agence) : null
+            };
+
+            Console.WriteLine($"Résultat retourné: IdBien={resultDto.IdBien}, IdAgence={resultDto.IdAgence}");
+            return Ok(resultDto);
         }
 
 
-        // DELETE: api/BienAgences/Bien/5/Agence/3/Date/2023-04-01
         [HttpDelete("Bien/{idBien}/Agence/{idAgence}/Date/{date}")]
         public async Task<IActionResult> DeleteBienAgence(int idBien, int idAgence, DateTime date)
         {

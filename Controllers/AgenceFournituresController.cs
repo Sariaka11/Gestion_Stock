@@ -333,7 +333,7 @@ namespace GestionFournituresAPI.Controllers
             }
 
             existing.Quantite = Math.Max(0, existing.Quantite - (int)createDto.ConsoMm.Value);
-            existing.ConsoMm = createDto.ConsoMm;
+            existing.ConsoMm = (existing.ConsoMm ?? 0) + createDto.ConsoMm.Value;
             existing.DateAssociation = DateTime.Now;
             _context.AgenceFournitures.Update(existing);
 
@@ -360,49 +360,6 @@ namespace GestionFournituresAPI.Controllers
             if (result == null)
             {
                 return NotFound("Erreur lors de la récupération de la consommation mise à jour.");
-            }
-
-            return Ok(result);
-        }
-
-        // PUT: api/AgenceFournitures/Agence/1/Fourniture/1
-        [HttpPut("Agence/{agenceId}/Fourniture/{fournitureId}")]
-        public async Task<ActionResult<AgenceFournitureDto>> UpdateAgenceFourniture(int agenceId, int fournitureId, [FromBody] AgenceFournitureUpdateDto updateDto)
-        {
-            var agenceFourniture = await _context.AgenceFournitures
-                .FirstOrDefaultAsync(af => af.AgenceId == agenceId && af.FournitureId == fournitureId);
-
-            if (agenceFourniture == null)
-            {
-                return NotFound($"Association entre l'agence {agenceId} et la fourniture {fournitureId} non trouvée.");
-            }
-
-            agenceFourniture.Quantite = updateDto.Quantite;
-            agenceFourniture.DateAssociation = DateTime.Now;
-            _context.AgenceFournitures.Update(agenceFourniture);
-            await _context.SaveChangesAsync();
-
-            var result = await _context.AgenceFournitures
-                .Include(af => af.Agence)
-                .Include(af => af.Fourniture)
-                .Where(af => af.Id == agenceFourniture.Id)
-                .Select(af => new AgenceFournitureDto
-                {
-                    Id = af.Id,
-                    AgenceId = af.AgenceId,
-                    AgenceNom = af.Agence != null ? af.Agence.Nom : "Agence inconnue",
-                    FournitureId = af.FournitureId,
-                    FournitureNom = af.Fourniture != null ? af.Fourniture.Nom : "Fourniture inconnue",
-                    Categorie = af.Fourniture != null ? af.Fourniture.Categorie : "Non catégorisé",
-                    Quantite = af.Quantite,
-                    DateAssociation = af.DateAssociation,
-                    ConsoMm = af.ConsoMm
-                })
-                .FirstOrDefaultAsync();
-
-            if (result == null)
-            {
-                return NotFound("Erreur lors de la récupération de l'association mise à jour.");
             }
 
             return Ok(result);

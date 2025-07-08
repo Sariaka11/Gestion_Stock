@@ -200,46 +200,61 @@ namespace GestionFournituresAPI.Controllers
             return NoContent();
         }
 
-        // DELETE: api/Immobilisations/5
-        [HttpDelete("{id}")]
-        public async Task<IActionResult> DeleteImmobilisation(int id)
+// DELETE: api/Immobilisations/5
+[HttpDelete("{id}")]
+public async Task<IActionResult> DeleteImmobilisation(int id)
+{
+    using var transaction = await _context.Database.BeginTransactionAsync();
+    
+    try
+    {
+        // Vérifier l'existence de l'immobilisation
+        var immobilisationExists = await _context.Immobilisations
+            .AsNoTracking()
+            .AnyAsync(i => i.IdBien == id);
+        
+        if (!immobilisationExists)
         {
-            try
-            {
-                var immobilisation = await _context.Immobilisations
-                    .FirstOrDefaultAsync(i => i.IdBien == id);
-
-                if (immobilisation == null)
-                {
-                    Console.WriteLine($"Immobilisation non trouv�e pour IdBien: {id}");
-                    return NotFound("Immobilisation non trouv�e.");
-                }
-
-                // V�rifier les affectations associ�es dans BIEN_AGENCE
-                var affectations = await _context.BienAgences
-                    .Where(ba => ba.IdBien == id)
-                    .ToListAsync();
-
-                if (affectations.Any())
-                {
-                    // Supprimer les affectations associ�es
-                    Console.WriteLine($"Suppression de {affectations.Count} affectations pour IdBien: {id}");
-                    _context.BienAgences.RemoveRange(affectations);
-                }
-
-                // Supprimer l'immobilisation
-                _context.Immobilisations.Remove(immobilisation);
-                await _context.SaveChangesAsync();
-
-                Console.WriteLine($"Immobilisation supprim�e avec succ�s: IdBien={id}");
-                return NoContent();
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"Erreur dans DeleteImmobilisation: {ex.Message}\n{ex.StackTrace}");
-                return StatusCode(500, $"Erreur lors de la suppression: {ex.Message}");
-            }
+            Console.WriteLine($"Immobilisation non trouvée pour IdBien: {id}");
+            return NotFound("Immobilisation non trouvée.");
         }
+
+        // 1. Supprimer les amortissements 
+        // Utilisez le vrai nom de la colonne dans Oracle (probablement ID_BIEN au lieu de IdBien)
+        var amortissementsCount = await _context.Database
+            .ExecuteSqlRawAsync("DELETE FROM AMORTISSEMENTS WHERE ID_BIEN = {0}", id);
+        
+        Console.WriteLine($"Suppression de {amortissementsCount} amortissements pour IdBien: {id}");
+
+        // 2. Supprimer les affectations
+        var affectationsCount = await _context.Database
+            .ExecuteSqlRawAsync("DELETE FROM BIEN_AGENCE WHERE ID_BIEN = {0}", id);
+        
+        Console.WriteLine($"Suppression de {affectationsCount} affectations pour IdBien: {id}");
+
+        // 3. Supprimer l'immobilisation
+        var immobilisationCount = await _context.Database
+            .ExecuteSqlRawAsync("DELETE FROM IMMOBILISATIONS WHERE ID_BIEN = {0}", id);
+        
+        if (immobilisationCount == 0)
+        {
+            await transaction.RollbackAsync();
+            return NotFound("Immobilisation non trouvée lors de la suppression.");
+        }
+
+        // 4. Confirmer la transaction
+        await transaction.CommitAsync();
+        
+        Console.WriteLine($"Immobilisation supprimée avec succès: IdBien={id}");
+        return NoContent();
+    }
+    catch (Exception ex)
+    {
+        await transaction.RollbackAsync();
+        Console.WriteLine($"Erreur dans DeleteImmobilisation: {ex.Message}\n{ex.StackTrace}");
+        return StatusCode(500, $"Erreur lors de la suppression: {ex.Message}");
+    }
+}
 
         private async Task CalculerProprietesDerivees(Immobilisation immobilisation)
         {
