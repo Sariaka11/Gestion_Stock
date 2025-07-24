@@ -41,7 +41,6 @@ namespace GestionFournituresAPI.Services
                 } : null,
                 Amortissements = immobilisation.Amortissements?.Select(a => new AmortissementDto
                 {
-                    IdAmortissement = a.IdAmortissement,
                     IdBien = a.IdBien,
                     Annee = a.Annee,
                     Montant = a.Montant,
@@ -77,7 +76,7 @@ namespace GestionFournituresAPI.Services
                 entity.NomBien = updateDto.NomBien;
             if (updateDto.CodeBarre != null)
                 entity.CodeBarre = updateDto.CodeBarre;
-            entity.ValeurAcquisition = updateDto.ValeurAcquisition; // Plus besoin de .HasValue car non nullable
+            entity.ValeurAcquisition = updateDto.ValeurAcquisition;
             if (updateDto.Quantite.HasValue)
                 entity.Quantite = updateDto.Quantite;
             if (updateDto.Statut != null)

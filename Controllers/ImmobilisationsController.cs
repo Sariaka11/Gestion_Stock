@@ -4,6 +4,7 @@ using GestionFournituresAPI.Models;
 using GestionFournituresAPI.Services;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Oracle.ManagedDataAccess.Client;
 
 namespace GestionFournituresAPI.Controllers
 {
@@ -61,35 +62,39 @@ namespace GestionFournituresAPI.Controllers
         {
             if (createDto == null)
             {
-                return BadRequest("Donn�es d'entr�e invalides.");
+                return BadRequest("Données d'entrée invalides.");
             }
 
-            // V�rifier si la cat�gorie existe
+            // Vérifier si la catégorie existe
             var categorie = await _context.Categories
                 .FirstOrDefaultAsync(c => c.IdCategorie == createDto.IdCategorie);
             if (categorie == null)
             {
-                return BadRequest("La cat�gorie sp�cifi�e n'existe pas.");
+                return BadRequest("La catégorie spécifiée n'existe pas.");
             }
 
             var immobilisation = _mappingService.ToEntity(createDto);
             if (immobilisation == null)
             {
-                return BadRequest("Erreur lors du mappage des donn�es.");
+                return BadRequest("Erreur lors du mappage des données.");
             }
 
-            // V�rifier que la date d'acquisition est fournie
+            // Vérifier que la date d'acquisition est fournie
             if (!immobilisation.DateAcquisition.HasValue)
             {
                 return BadRequest("La date d'acquisition est requise pour calculer l'amortissement.");
             }
 
-            // Calculer le taux d'amortissement � partir de la dur�e de la cat�gorie
+            // Enregistrer l'immobilisation pour obtenir IdBien
+            _context.Immobilisations.Add(immobilisation);
+            await _context.SaveChangesAsync();
+
+            // Calculer le taux d'amortissement à partir de la durée de la catégorie
             decimal tauxAmortissement = 100m / categorie.DureeAmortissement;
             decimal amortissementAnnuel = immobilisation.ValeurAcquisition * (tauxAmortissement / 100m);
             decimal valeurResiduelle = immobilisation.ValeurAcquisition;
 
-            // G�n�rer les enregistrements d'amortissement
+            // Générer les enregistrements d'amortissement avec l'IdBien généré
             immobilisation.Amortissements = new List<Amortissement>();
             int anneeDebut = immobilisation.DateAcquisition.Value.Year;
             for (int i = 0; i < categorie.DureeAmortissement; i++)
@@ -97,25 +102,27 @@ namespace GestionFournituresAPI.Controllers
                 valeurResiduelle -= amortissementAnnuel;
                 var amortissement = new Amortissement
                 {
-                    IdBien = immobilisation.IdBien,
+                    IdBien = immobilisation.IdBien, // Utiliser l'IdBien généré
                     Annee = anneeDebut + i,
                     Montant = amortissementAnnuel,
                     ValeurResiduelle = Math.Max(0, valeurResiduelle),
                     DateCalcul = DateTime.Now
+                    // IdAmortissement laissé vide pour utiliser la séquence
                 };
                 immobilisation.Amortissements.Add(amortissement);
             }
 
-            // Calculer les propri�t�s d�riv�es
-            await CalculerProprietesDerivees(immobilisation);
-
-            // Enregistrer l'immobilisation et les amortissements
-            _context.Immobilisations.Add(immobilisation);
+            // Enregistrer les amortissements
             await _context.SaveChangesAsync();
+
+            // Calculer les propriétés dérivées après l'insertion
+            await CalculerProprietesDerivees(immobilisation);
 
             var immobilisationDto = _mappingService.ToDto(immobilisation);
             return CreatedAtAction(nameof(GetImmobilisation), new { id = immobilisation.IdBien }, immobilisationDto);
         }
+
+
 
         // PUT: api/Immobilisations/5
         [HttpPut("{id}")]

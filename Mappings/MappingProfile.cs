@@ -10,7 +10,15 @@ namespace GestionFournituresAPI.Mappings
         {
             // Mappage pour Amortissement
             CreateMap<Amortissement, AmortissementDto>()
-                .ForMember(dest => dest.IdAmortissement, opt => opt.MapFrom(src => src.IdAmortissement))
+                .ForMember(dest => dest.IdBien, opt => opt.MapFrom(src => src.IdBien))
+                .ForMember(dest => dest.Annee, opt => opt.MapFrom(src => src.Annee))
+                .ForMember(dest => dest.Montant, opt => opt.MapFrom(src => src.Montant))
+                .ForMember(dest => dest.ValeurResiduelle, opt => opt.MapFrom(src => src.ValeurResiduelle))
+                .ForMember(dest => dest.DateCalcul, opt => opt.MapFrom(src => src.DateCalcul));
+
+            // Mappage inverse pour AmortissementDto vers Amortissement
+            CreateMap<AmortissementDto, Amortissement>()
+                .ForMember(dest => dest.IdAmortissement, opt => opt.Ignore())
                 .ForMember(dest => dest.IdBien, opt => opt.MapFrom(src => src.IdBien))
                 .ForMember(dest => dest.Annee, opt => opt.MapFrom(src => src.Annee))
                 .ForMember(dest => dest.Montant, opt => opt.MapFrom(src => src.Montant))
@@ -18,31 +26,25 @@ namespace GestionFournituresAPI.Mappings
                 .ForMember(dest => dest.DateCalcul, opt => opt.MapFrom(src => src.DateCalcul));
 
             // Mappage pour Immobilisation
+            CreateMap<ImmobilisationCreateDto, Immobilisation>()
+                .ForMember(dest => dest.Amortissements, opt => opt.Ignore())
+                .ForMember(dest => dest.Categorie, opt => opt.Ignore());
+
             CreateMap<Immobilisation, ImmobilisationDto>()
                 .ForMember(dest => dest.Categorie, opt => opt.MapFrom(src => src.Categorie))
                 .ForMember(dest => dest.Amortissements, opt => opt.MapFrom(src => src.Amortissements));
 
-            // Mappage pour BienAgence
+            // Autres mappages
             CreateMap<BienAgence, BienAgenceDto>()
                 .ForMember(dest => dest.Immobilisation, opt => opt.MapFrom(src => src.Immobilisation))
                 .ForMember(dest => dest.Agence, opt => opt.MapFrom(src => src.Agence));
             CreateMap<BienAgenceDto, BienAgence>();
-
-            // Mappage pour Agence
             CreateMap<Agence, AgenceDto>();
-
-            // Mappage pour UserAgence
             CreateMap<UserAgence, UserAgenceDto>()
                 .ForMember(dest => dest.User, opt => opt.MapFrom(src => src.User))
                 .ForMember(dest => dest.Agence, opt => opt.MapFrom(src => src.Agence));
-
-            // Mappage pour User
             CreateMap<User, UserDto>();
-
-            // Mappage pour Fourniture
             CreateMap<Fourniture, FournitureDto>();
-
-            // Mappage pour Categorie
             CreateMap<Categorie, CategorieDto>();
         }
     }

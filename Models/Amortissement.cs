@@ -8,6 +8,7 @@ namespace GestionFournituresAPI.Models
     {
         [Key]
         [Column("ID_AMORTISSEMENT")]
+        [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
         public int IdAmortissement { get; set; }
 
         [Required]

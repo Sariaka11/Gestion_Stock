@@ -55,7 +55,7 @@ namespace GestionFournituresAPI.Data
 
             // Configuration de la relation many-to-many entre User et Agence
             modelBuilder.Entity<UserAgence>()
-                .HasKey(ua => new { ua.UserId, ua.AgenceId });
+                .HasKey(ua => ua.Id);
 
             modelBuilder.Entity<UserAgence>()
                 .HasOne(ua => ua.User)
@@ -68,18 +68,57 @@ namespace GestionFournituresAPI.Data
                 .HasForeignKey(ua => ua.AgenceId);
 
             // Configuration de la relation many-to-many entre User et Fourniture
-            modelBuilder.Entity<UserFourniture>()
-                .HasKey(uf => new { uf.UserId, uf.FournitureId });
+            modelBuilder.Entity<UserFourniture>(entity =>
+            {
+                entity.ToTable("USER_FOURNITURE", "SYSTEM");
+                entity.HasKey(e => e.Id);
+                entity.Property(e => e.Id).HasColumnName("ID").ValueGeneratedOnAdd();
+                entity.Property(e => e.UserId).HasColumnName("USER_ID");
+                entity.Property(e => e.FournitureId).HasColumnName("FOURNITURE_ID");
+                entity.Property(e => e.DateAssociation).HasColumnName("DATE_ASSOCIATION");
+                
+                entity.HasOne(uf => uf.User)
+                      .WithMany(u => u.UserFournitures)
+                      .HasForeignKey(uf => uf.UserId);
 
-            modelBuilder.Entity<UserFourniture>()
-                .HasOne(uf => uf.User)
-                .WithMany(u => u.UserFournitures)
-                .HasForeignKey(uf => uf.UserId);
+                entity.HasOne(uf => uf.Fourniture)
+                      .WithMany(f => f.UserFournitures)
+                      .HasForeignKey(uf => uf.FournitureId);
+            });
 
-            modelBuilder.Entity<UserFourniture>()
-                .HasOne(uf => uf.Fourniture)
-                .WithMany(f => f.UserFournitures)
-                .HasForeignKey(uf => uf.FournitureId);
+            // Configuration pour Notification
+            modelBuilder.Entity<Notification>(entity =>
+            {
+                entity.ToTable("NOTIFICATIONS", "SYSTEM");
+                entity.HasKey(e => e.Id);
+                entity.Property(e => e.Id)
+                      .HasColumnName("ID")
+                      .ValueGeneratedOnAdd()
+                      .HasAnnotation("Oracle:UseSequenceName", "NOTIFICATIONS_CUSTOM_SEQ");
+                entity.Property(e => e.UserId).HasColumnName("USER_ID");
+                entity.Property(e => e.AgenceId).HasColumnName("AGENCE_ID");
+                entity.Property(e => e.FournitureId).HasColumnName("FOURNITURE_ID");
+                entity.Property(e => e.BienId).HasColumnName("BIEN_ID");
+                entity.Property(e => e.Titre).HasColumnName("TITRE");
+                entity.Property(e => e.Corps).HasColumnName("CORPS");
+                entity.Property(e => e.DateDemande).HasColumnName("DATE_DEMANDE");
+                entity.Property(e => e.Statut).HasColumnName("STATUT");
+                entity.Ignore(e => e.UserName);
+
+                entity.HasOne(n => n.Agence)
+                      .WithMany(a => a.Notifications)
+                      .HasForeignKey(n => n.AgenceId);
+
+                entity.HasOne(n => n.Fourniture)
+                      .WithMany(f => f.Notifications)
+                      .HasForeignKey(n => n.FournitureId)
+                      .OnDelete(DeleteBehavior.SetNull);
+
+                entity.HasOne(n => n.Immobilisation)
+                      .WithMany(i => i.Notifications)
+                      .HasForeignKey(n => n.BienId)
+                      .OnDelete(DeleteBehavior.SetNull);
+            });
 
             // Relation entre Immobilisation et Categorie
             modelBuilder.Entity<Immobilisation>()
@@ -87,6 +126,12 @@ namespace GestionFournituresAPI.Data
                 .WithMany(c => c.Immobilisations)
                 .HasForeignKey(i => i.IdCategorie)
                 .OnDelete(DeleteBehavior.SetNull);
+
+              // Configuration pour utiliser le trigger Oracle
+    modelBuilder.Entity<Amortissement>()
+        .Property(e => e.IdAmortissement)
+        .ValueGeneratedOnAdd()  // Important !
+        .HasColumnName("ID_AMORTISSEMENT");
 
             // Relation entre Amortissement et Immobilisation
             modelBuilder.Entity<Amortissement>()
@@ -114,43 +159,6 @@ namespace GestionFournituresAPI.Data
                 .WithMany(i => i.BienAgences)
                 .HasForeignKey(ba => ba.IdBien);
 
-            modelBuilder.Entity<Notification>(entity =>
-                {
-                    // Spécifier explicitement le nom de la table en majuscules
-                    entity.ToTable("NOTIFICATIONS");
-                    
-                    // Mapper explicitement les colonnes
-                    entity.Property(e => e.Id).HasColumnName("ID");
-                    entity.Property(e => e.UserId).HasColumnName("USER_ID");
-                    entity.Property(e => e.AgenceId).HasColumnName("AGENCE_ID");
-                    entity.Property(e => e.FournitureId).HasColumnName("FOURNITURE_ID");
-                    entity.Property(e => e.BienId).HasColumnName("BIEN_ID");
-                    entity.Property(e => e.Titre).HasColumnName("TITRE");
-                    entity.Property(e => e.Corps).HasColumnName("CORPS");
-                    entity.Property(e => e.DateDemande).HasColumnName("DATE_DEMANDE");
-                    entity.Property(e => e.Statut).HasColumnName("STATUT");
-                    
-                    // Ignorer UserName s'il n'est pas dans la DB
-                    entity.Ignore(e => e.UserName);
-                });
-
-            // Configuration pour Notification
-            modelBuilder.Entity<Notification>()
-                .HasOne(n => n.Agence)
-                .WithMany(a => a.Notifications)
-                .HasForeignKey(n => n.AgenceId);
-
-            modelBuilder.Entity<Notification>()
-                .HasOne(n => n.Fourniture)
-                .WithMany(f => f.Notifications)
-                .HasForeignKey(n => n.FournitureId)
-                .OnDelete(DeleteBehavior.SetNull);
-
-            modelBuilder.Entity<Notification>()
-                .HasOne(n => n.Immobilisation)
-                .WithMany(i => i.Notifications)
-                .HasForeignKey(n => n.BienId)
-                .OnDelete(DeleteBehavior.SetNull);
 
             // Configuration pour gérer les valeurs NULL dans Oracle
             modelBuilder.Entity<Immobilisation>()

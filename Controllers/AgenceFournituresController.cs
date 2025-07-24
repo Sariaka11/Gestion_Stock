@@ -149,6 +149,7 @@ namespace GestionFournituresAPI.Controllers
         [HttpPost]
         public async Task<ActionResult<AgenceFournitureDto>> PostAgenceFourniture(AgenceFourniture agenceFourniture)
         {
+            // Vérifications préalables
             if (!_context.Agences.Any(a => a.Id == agenceFourniture.AgenceId))
             {
                 return BadRequest("L'agence spécifiée n'existe pas.");
@@ -171,9 +172,11 @@ namespace GestionFournituresAPI.Controllers
                     af.AgenceId == agenceFourniture.AgenceId &&
                     af.FournitureId == agenceFourniture.FournitureId);
 
-            int resultId;
+            AgenceFourniture resultEntity;
+
             if (existing != null)
             {
+                // Mise à jour d'une association existante
                 if (fourniture.QuantiteRestante < (existing.Quantite + agenceFourniture.Quantite))
                 {
                     return BadRequest("La quantité totale dépasse le stock restant.");
@@ -182,23 +185,23 @@ namespace GestionFournituresAPI.Controllers
                 existing.Quantite += agenceFourniture.Quantite;
                 existing.DateAssociation = DateTime.Now;
                 _context.AgenceFournitures.Update(existing);
-                resultId = existing.Id;
-
-                fourniture.QuantiteRestante -= agenceFourniture.Quantite;
-                _context.Fournitures.Update(fourniture);
+                resultEntity = existing;
             }
             else
             {
+                // Création d'une nouvelle association
                 agenceFourniture.DateAssociation = DateTime.Now;
                 _context.AgenceFournitures.Add(agenceFourniture);
-                resultId = agenceFourniture.Id;
-
-                fourniture.QuantiteRestante -= agenceFourniture.Quantite;
-                _context.Fournitures.Update(fourniture);
+                resultEntity = agenceFourniture;
             }
 
+            // Enregistrement des modifications
             await _context.SaveChangesAsync();
 
+            // Récupérer l'ID généré pour la nouvelle entité
+            int resultId = resultEntity.Id;
+
+            // Recharger l'entité depuis la base de données pour garantir les données à jour
             var result = await _context.AgenceFournitures
                 .Include(af => af.Agence)
                 .Include(af => af.Fourniture)
@@ -219,8 +222,15 @@ namespace GestionFournituresAPI.Controllers
 
             if (result == null)
             {
+                // Log pour diagnostic
+                Console.WriteLine($"Échec de la récupération de l'AgenceFourniture avec Id {resultId}");
                 return NotFound("Erreur lors de la récupération de l'association créée.");
             }
+
+            // Mettre à jour la quantité restante de la fourniture
+            fourniture.QuantiteRestante -= agenceFourniture.Quantite;
+            _context.Fournitures.Update(fourniture);
+            await _context.SaveChangesAsync();
 
             return CreatedAtAction(nameof(GetAgenceFourniture), new { id = result.Id }, result);
         }

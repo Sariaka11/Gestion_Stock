@@ -2,7 +2,6 @@
 {
     public class AmortissementDto
     {
-        public int IdAmortissement { get; set; }
         public int IdBien { get; set; } // Reference to Immobilisation by ID, not object
         public int Annee { get; set; }
         public decimal Montant { get; set; }
