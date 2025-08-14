@@ -32,7 +32,6 @@ namespace GestionFournituresAPI.Models
         // Ajout des propriétés de navigation
         public virtual ICollection<EntreeFourniture> EntreesFournitures { get; set; } = new List<EntreeFourniture>();
         public virtual ICollection<AgenceFourniture> AgenceFournitures { get; set; } = new List<AgenceFourniture>();
-        public virtual ICollection<UserFourniture> UserFournitures { get; set; } = new List<UserFourniture>();
         public virtual ICollection<Notification> Notifications { get; set; } = new List<Notification>();
 
         // Propriétés calculées (non stockées en base de données)

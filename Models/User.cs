@@ -34,8 +34,6 @@ namespace GestionFournituresAPI.Models
         [Column("FONCTION")]
         [StringLength(20)]
         public string? Fonction { get; set; }
-        public virtual ICollection<UserFourniture> UserFournitures { get; set; } = new List<UserFourniture>();
-
         // Relations avec UserAgence
         public virtual ICollection<UserAgence> UserAgences { get; set; } = new List<UserAgence>();     // public virtual Agence Agence { get; set; }
     }

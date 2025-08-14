@@ -41,7 +41,7 @@ namespace GestionFournituresAPI.Models
         // Navigation properties
         [ForeignKey("IdCategorie")]
         public virtual Categorie? Categorie { get; set; }
-
+    
         public virtual ICollection<Amortissement>? Amortissements { get; set; }
 
         public virtual ICollection<BienAgence>? BienAgences { get; set; }

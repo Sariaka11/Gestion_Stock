@@ -19,6 +19,7 @@ namespace GestionFournituresAPI.Models
         public DateTime DateDemande { get; set; }
         public string? Statut { get; set; }
         
+        
         // Navigation properties
         public Agence? Agence { get; set; }
         public Fourniture? Fourniture { get; set; }

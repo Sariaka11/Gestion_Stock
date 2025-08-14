@@ -17,6 +17,7 @@ namespace GestionFournituresAPI
     {
         public static void Main(string[] args)
         {
+            
             var builder = WebApplication.CreateBuilder(args);
 
             // Configuration CORS
@@ -47,7 +48,7 @@ namespace GestionFournituresAPI
             // Enregistrement des services
             builder.Services.AddScoped<AmortissementService>();
             builder.Services.AddScoped<IImmobilisationMappingService, ImmobilisationMappingService>();
-
+            builder.Services.AddScoped<IExcelImportService, ExcelImportService>();
             // Configuration d'AutoMapper
             builder.Services.AddAutoMapper(typeof(MappingProfile));
 

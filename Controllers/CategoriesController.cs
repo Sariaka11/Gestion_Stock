@@ -29,20 +29,20 @@ namespace GestionFournituresAPI.Controllers
         {
             try
             {
-                _logger.LogInformation("Récupération de toutes les catégories");
+                _logger.LogInformation("Rï¿½cupï¿½ration de toutes les catï¿½gories");
 
                 var categories = await _context.Categories
                     .AsNoTracking()
                     .ToListAsync();
 
-                _logger.LogInformation($"Nombre de catégories récupérées: {categories.Count}");
+                _logger.LogInformation($"Nombre de catï¿½gories rï¿½cupï¿½rï¿½es: {categories.Count}");
 
                 return Ok(categories);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Erreur lors de la récupération des catégories");
-                return StatusCode(500, new { message = "Erreur lors de la récupération des catégories", error = ex.Message });
+                _logger.LogError(ex, "Erreur lors de la rï¿½cupï¿½ration des catï¿½gories");
+                return StatusCode(500, new { message = "Erreur lors de la rï¿½cupï¿½ration des catï¿½gories", error = ex.Message });
             }
         }
 
@@ -52,7 +52,7 @@ namespace GestionFournituresAPI.Controllers
         {
             try
             {
-                _logger.LogInformation($"Récupération de la catégorie avec ID: {id}");
+                _logger.LogInformation($"Rï¿½cupï¿½ration de la catï¿½gorie avec ID: {id}");
 
                 var categorie = await _context.Categories
                     .AsNoTracking()
@@ -60,41 +60,78 @@ namespace GestionFournituresAPI.Controllers
 
                 if (categorie == null)
                 {
-                    _logger.LogWarning($"Catégorie avec ID {id} non trouvée");
-                    return NotFound(new { message = $"Catégorie avec ID {id} non trouvée" });
+                    _logger.LogWarning($"Catï¿½gorie avec ID {id} non trouvï¿½e");
+                    return NotFound(new { message = $"Catï¿½gorie avec ID {id} non trouvï¿½e" });
                 }
 
                 return Ok(categorie);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, $"Erreur lors de la récupération de la catégorie {id}");
-                return StatusCode(500, new { message = $"Erreur lors de la récupération de la catégorie {id}", error = ex.Message });
+                _logger.LogError(ex, $"Erreur lors de la rï¿½cupï¿½ration de la catï¿½gorie {id}");
+                return StatusCode(500, new { message = $"Erreur lors de la rï¿½cupï¿½ration de la catï¿½gorie {id}", error = ex.Message });
+            }
+        }
+
+        // GET: api/Categories/5/sous-categories
+        [HttpGet("{id}/sous-categories")]
+        public async Task<ActionResult<IEnumerable<CategorieSimpleDto>>> GetSousCategories(int id)
+        {
+            try
+            {
+                _logger.LogInformation($"RÃ©cupÃ©ration des sous-catÃ©gories pour la catÃ©gorie ID: {id}");
+
+                var sousCategories = await _context.Categories
+                    .Where(c => c.ParentCategorieId == id)
+                    .Select(c => new CategorieSimpleDto
+                    {
+                        IdCategorie = c.IdCategorie,
+                        NomCategorie = c.NomCategorie
+                    })
+                    .ToListAsync();
+
+                return Ok(sousCategories);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Erreur lors de la rÃ©cupÃ©ration des sous-catÃ©gories pour la catÃ©gorie {id}");
+                return StatusCode(500, new { message = $"Erreur lors de la rÃ©cupÃ©ration des sous-catÃ©gories", error = ex.Message });
             }
         }
 
         // POST: api/Categories
         [HttpPost]
-        public async Task<ActionResult<Categorie>> PostCategorie(Categorie categorie)
+public async Task<ActionResult<Categorie>> PostCategorie(Categorie categorie)
+{
+    try
+    {
+        _logger.LogInformation("CrÃ©ation d'une nouvelle catÃ©gorie");
+        _logger.LogDebug($"DonnÃ©es reÃ§ues: {System.Text.Json.JsonSerializer.Serialize(categorie)}");
+
+        // VÃ©rifier si ParentCategorieId est valide
+        if (categorie.ParentCategorieId.HasValue)
         {
-            try
+            var parentExists = await _context.Categories.AnyAsync(c => c.IdCategorie == categorie.ParentCategorieId);
+            if (!parentExists)
             {
-                _logger.LogInformation("Création d'une nouvelle catégorie");
-                _logger.LogDebug($"Données reçues: {System.Text.Json.JsonSerializer.Serialize(categorie)}");
-
-                _context.Categories.Add(categorie);
-                await _context.SaveChangesAsync();
-
-                _logger.LogInformation($"Catégorie créée avec ID: {categorie.IdCategorie}");
-
-                return CreatedAtAction(nameof(GetCategorie), new { id = categorie.IdCategorie }, categorie);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Erreur lors de la création de la catégorie");
-                return StatusCode(500, new { message = "Erreur lors de la création de la catégorie", error = ex.Message });
+                _logger.LogWarning($"CatÃ©gorie parente avec ID {categorie.ParentCategorieId} non trouvÃ©e");
+                return BadRequest(new { message = $"CatÃ©gorie parente avec ID {categorie.ParentCategorieId} non trouvÃ©e" });
             }
         }
+
+        _context.Categories.Add(categorie);
+        await _context.SaveChangesAsync();
+
+        _logger.LogInformation($"CatÃ©gorie crÃ©Ã©e avec ID: {categorie.IdCategorie}");
+
+        return CreatedAtAction(nameof(GetCategorie), new { id = categorie.IdCategorie }, categorie);
+    }
+    catch (Exception ex)
+    {
+        _logger.LogError(ex, "Erreur lors de la crÃ©ation de la catÃ©gorie");
+        return StatusCode(500, new { message = "Erreur lors de la crÃ©ation de la catÃ©gorie", error = ex.Message });
+    }
+}
 
         // PUT: api/Categories/5
         [HttpPut("{id}")]
@@ -102,19 +139,19 @@ namespace GestionFournituresAPI.Controllers
         {
             if (id != categorie.IdCategorie)
             {
-                _logger.LogWarning("L'ID dans l'URL ne correspond pas à l'ID dans les données");
-                return BadRequest(new { message = "L'ID dans l'URL ne correspond pas à l'ID dans les données" });
+                _logger.LogWarning("L'ID dans l'URL ne correspond pas ï¿½ l'ID dans les donnï¿½es");
+                return BadRequest(new { message = "L'ID dans l'URL ne correspond pas ï¿½ l'ID dans les donnï¿½es" });
             }
 
             try
             {
-                _logger.LogInformation($"Mise à jour de la catégorie avec ID: {id}");
-                _logger.LogDebug($"Données reçues: {System.Text.Json.JsonSerializer.Serialize(categorie)}");
+                _logger.LogInformation($"Mise ï¿½ jour de la catï¿½gorie avec ID: {id}");
+                _logger.LogDebug($"Donnï¿½es reï¿½ues: {System.Text.Json.JsonSerializer.Serialize(categorie)}");
 
                 _context.Entry(categorie).State = EntityState.Modified;
                 await _context.SaveChangesAsync();
 
-                _logger.LogInformation($"Catégorie avec ID {id} mise à jour avec succès");
+                _logger.LogInformation($"Catï¿½gorie avec ID {id} mise ï¿½ jour avec succï¿½s");
 
                 return NoContent();
             }
@@ -122,21 +159,37 @@ namespace GestionFournituresAPI.Controllers
             {
                 if (!CategorieExists(id))
                 {
-                    _logger.LogWarning($"Catégorie avec ID {id} non trouvée lors de la mise à jour");
-                    return NotFound(new { message = $"Catégorie avec ID {id} non trouvée" });
+                    _logger.LogWarning($"Catï¿½gorie avec ID {id} non trouvï¿½e lors de la mise ï¿½ jour");
+                    return NotFound(new { message = $"Catï¿½gorie avec ID {id} non trouvï¿½e" });
                 }
                 else
                 {
-                    _logger.LogError(ex, $"Erreur de concurrence lors de la mise à jour de la catégorie {id}");
+                    _logger.LogError(ex, $"Erreur de concurrence lors de la mise ï¿½ jour de la catï¿½gorie {id}");
                     throw;
                 }
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, $"Erreur lors de la mise à jour de la catégorie {id}");
-                return StatusCode(500, new { message = $"Erreur lors de la mise à jour de la catégorie {id}", error = ex.Message });
+                _logger.LogError(ex, $"Erreur lors de la mise ï¿½ jour de la catï¿½gorie {id}");
+                return StatusCode(500, new { message = $"Erreur lors de la mise ï¿½ jour de la catï¿½gorie {id}", error = ex.Message });
             }
         }
+
+        [HttpGet("principales")]
+public async Task<ActionResult<IEnumerable<CategorieSimpleDto>>> GetCategoriesPrincipales()
+{
+    var principales = await _context.Categories
+        .Where(c => c.ParentCategorieId == null)
+        .Select(c => new CategorieSimpleDto
+        {
+            IdCategorie = c.IdCategorie,
+            NomCategorie = c.NomCategorie
+        })
+        .ToListAsync();
+
+    return Ok(principales);
+}
+
 
         // DELETE: api/Categories/5
         [HttpDelete("{id}")]
@@ -144,25 +197,25 @@ namespace GestionFournituresAPI.Controllers
         {
             try
             {
-                _logger.LogInformation($"Suppression de la catégorie avec ID: {id}");
+                _logger.LogInformation($"Suppression de la catï¿½gorie avec ID: {id}");
 
                 var categorie = await _context.Categories.FindAsync(id);
                 if (categorie == null)
                 {
-                    _logger.LogWarning($"Catégorie avec ID {id} non trouvée lors de la suppression");
-                    return NotFound(new { message = $"Catégorie avec ID {id} non trouvée" });
+                    _logger.LogWarning($"Catï¿½gorie avec ID {id} non trouvï¿½e lors de la suppression");
+                    return NotFound(new { message = $"Catï¿½gorie avec ID {id} non trouvï¿½e" });
                 }
 
                 _context.Categories.Remove(categorie);
                 await _context.SaveChangesAsync();
 
-                _logger.LogInformation($"Catégorie avec ID {id} supprimée avec succès");
+                _logger.LogInformation($"Catï¿½gorie avec ID {id} supprimï¿½e avec succï¿½s");
                 return NoContent();
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, $"Erreur lors de la suppression de la catégorie {id}");
-                return StatusCode(500, new { message = $"Erreur lors de la suppression de la catégorie {id}", error = ex.Message });
+                _logger.LogError(ex, $"Erreur lors de la suppression de la catï¿½gorie {id}");
+                return StatusCode(500, new { message = $"Erreur lors de la suppression de la catï¿½gorie {id}", error = ex.Message });
             }
         }
 
@@ -170,5 +223,10 @@ namespace GestionFournituresAPI.Controllers
         {
             return _context.Categories.Any(e => e.IdCategorie == id);
         }
+    }
+     public class CategorieSimpleDto
+    {
+        public int IdCategorie { get; set; }
+        public string NomCategorie { get; set; } = string.Empty;
     }
 }

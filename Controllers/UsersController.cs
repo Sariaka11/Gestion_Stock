@@ -87,54 +87,54 @@ namespace GestionFournituresAPI.Controllers
         }
 
         // GET: api/Users/5/Fournitures
-        [HttpGet("{id}/Fournitures")]
-        public async Task<ActionResult<IEnumerable<FournitureDto>>> GetUserFournitures(int id)
-        {
-            try
-            {
-                // Vérifier si l'utilisateur existe
-                var user = await _context.Users.FindAsync(id);
-                if (user == null)
-                {
-                    return NotFound("Utilisateur non trouvé.");
-                }
+        // [HttpGet("{id}/Fournitures")]
+        // public async Task<ActionResult<IEnumerable<FournitureDto>>> GetUserFournitures(int id)
+        // {
+        //     try
+        //     {
+        //         // Vérifier si l'utilisateur existe
+        //         var user = await _context.Users.FindAsync(id);
+        //         if (user == null)
+        //         {
+        //             return NotFound("Utilisateur non trouvé.");
+        //         }
 
-                var userFournitures = await _context.UserFournitures
-                    .AsNoTracking()
-                    .Where(uf => uf.UserId == id)
-                    .ToListAsync();
+        //         // var userFournitures = await _context.UserFournitures
+        //         //     .AsNoTracking()
+        //         //     .Where(uf => uf.UserId == id)
+        //         //     .ToListAsync();
 
-                if (!userFournitures.Any())
-                {
-                    return Ok(new List<FournitureDto>());
-                }
+        //         if (!userFournitures.Any())
+        //         {
+        //             return Ok(new List<FournitureDto>());
+        //         }
 
-                // Récupérer les fournitures séparément
-                var fournitureIds = userFournitures.Select(uf => uf.FournitureId).ToList();
-                var fournitures = await _context.Fournitures
-                    .AsNoTracking()
-                    .Where(f => fournitureIds.Contains(f.Id))
-                    .ToListAsync();
+        //         // Récupérer les fournitures séparément
+        //         // var fournitureIds = userFournitures.Select(uf => uf.FournitureId).ToList();
+        //         // var fournitures = await _context.Fournitures
+        //             .AsNoTracking()
+        //             .Where(f => fournitureIds.Contains(f.Id))
+        //             .ToListAsync();
 
-                if (!fournitures.Any())
-                {
-                    return NotFound("Aucune fourniture valide n'est associée à cet utilisateur.");
-                }
+        //         if (!fournitures.Any())
+        //         {
+        //             return NotFound("Aucune fourniture valide n'est associée à cet utilisateur.");
+        //         }
 
-                // Calculer le CMUP pour chaque fourniture
-                var fournitureDtos = _mapper.Map<List<FournitureDto>>(fournitures);
-                foreach (var fournitureDto in fournitureDtos)
-                {
-                    fournitureDto.CMUP = CalculerCMUP(fournitureDto.Id);
-                }
+        //         // Calculer le CMUP pour chaque fourniture
+        //         var fournitureDtos = _mapper.Map<List<FournitureDto>>(fournitures);
+        //         foreach (var fournitureDto in fournitureDtos)
+        //         {
+        //             fournitureDto.CMUP = CalculerCMUP(fournitureDto.Id);
+        //         }
 
-                return Ok(fournitureDtos);
-            }
-            catch (Exception ex)
-            {
-                return StatusCode(500, $"Erreur interne: {ex.Message}");
-            }
-        }
+        //         return Ok(fournitureDtos);
+        //     }
+        //     catch (Exception ex)
+        //     {
+        //         return StatusCode(500, $"Erreur interne: {ex.Message}");
+        //     }
+        // }
 
         // POST: api/Users
         [HttpPost]
@@ -240,8 +240,8 @@ namespace GestionFournituresAPI.Controllers
                 _context.UserAgences.Remove(userAgence);
             }
 
-            var userFournitures = await _context.UserFournitures.Where(uf => uf.UserId == id).ToListAsync();
-            _context.UserFournitures.RemoveRange(userFournitures);
+            // var userFournitures = await _context.UserFournitures.Where(uf => uf.UserId == id).ToListAsync();
+            // _context.UserFournitures.RemoveRange(userFournitures);
 
             _context.Users.Remove(user);
             await _context.SaveChangesAsync();

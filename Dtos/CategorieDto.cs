@@ -6,4 +6,7 @@
         public string NomCategorie { get; set; } = string.Empty;
         public int DureeAmortissement { get; set; }
     }
+   
+
+
 }

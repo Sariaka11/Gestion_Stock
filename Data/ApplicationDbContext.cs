@@ -16,10 +16,7 @@ namespace GestionFournituresAPI.Data
         public DbSet<Fourniture> Fournitures { get; set; } = null!;
         public DbSet<AgenceFourniture> AgenceFournitures { get; set; } = null!;
         public DbSet<UserAgence> UserAgences { get; set; } = null!;
-        public DbSet<UserFourniture> UserFournitures { get; set; } = null!;
         public DbSet<EntreeFourniture> EntreeFournitures { get; set; } = null!;
-
-        // Nouvelles tables pour la gestion de l'immobilier
         public DbSet<Categorie> Categories { get; set; } = null!;
         public DbSet<Immobilisation> Immobilisations { get; set; } = null!;
         public DbSet<Amortissement> Amortissements { get; set; } = null!;
@@ -35,9 +32,13 @@ namespace GestionFournituresAPI.Data
                 .HasIndex(u => u.Email)
                 .IsUnique();
 
-            modelBuilder.Entity<Agence>()
-                .HasIndex(a => a.Numero)
-                .IsUnique();
+            modelBuilder.Entity<Agence>(entity =>
+            {
+                entity.HasKey(e => e.Id);
+                entity.Property(e => e.Id)
+                      .ValueGeneratedOnAdd()
+                      .HasAnnotation("Oracle:Identity", "START WITH 1 INCREMENT BY 1");
+            });
 
             // Configuration de la relation many-to-many entre Agence et Fourniture
             modelBuilder.Entity<AgenceFourniture>()
@@ -66,25 +67,6 @@ namespace GestionFournituresAPI.Data
                 .HasOne(ua => ua.Agence)
                 .WithMany(a => a.UserAgences)
                 .HasForeignKey(ua => ua.AgenceId);
-
-            // Configuration de la relation many-to-many entre User et Fourniture
-            modelBuilder.Entity<UserFourniture>(entity =>
-            {
-                entity.ToTable("USER_FOURNITURE", "SYSTEM");
-                entity.HasKey(e => e.Id);
-                entity.Property(e => e.Id).HasColumnName("ID").ValueGeneratedOnAdd();
-                entity.Property(e => e.UserId).HasColumnName("USER_ID");
-                entity.Property(e => e.FournitureId).HasColumnName("FOURNITURE_ID");
-                entity.Property(e => e.DateAssociation).HasColumnName("DATE_ASSOCIATION");
-                
-                entity.HasOne(uf => uf.User)
-                      .WithMany(u => u.UserFournitures)
-                      .HasForeignKey(uf => uf.UserId);
-
-                entity.HasOne(uf => uf.Fourniture)
-                      .WithMany(f => f.UserFournitures)
-                      .HasForeignKey(uf => uf.FournitureId);
-            });
 
             // Configuration pour Notification
             modelBuilder.Entity<Notification>(entity =>
@@ -127,11 +109,11 @@ namespace GestionFournituresAPI.Data
                 .HasForeignKey(i => i.IdCategorie)
                 .OnDelete(DeleteBehavior.SetNull);
 
-              // Configuration pour utiliser le trigger Oracle
-    modelBuilder.Entity<Amortissement>()
-        .Property(e => e.IdAmortissement)
-        .ValueGeneratedOnAdd()  // Important !
-        .HasColumnName("ID_AMORTISSEMENT");
+            // Configuration pour utiliser le trigger Oracle
+            modelBuilder.Entity<Amortissement>()
+                .Property(e => e.IdAmortissement)
+                .ValueGeneratedOnAdd()
+                .HasColumnName("ID_AMORTISSEMENT");
 
             // Relation entre Amortissement et Immobilisation
             modelBuilder.Entity<Amortissement>()
@@ -159,7 +141,6 @@ namespace GestionFournituresAPI.Data
                 .WithMany(i => i.BienAgences)
                 .HasForeignKey(ba => ba.IdBien);
 
-
             // Configuration pour gérer les valeurs NULL dans Oracle
             modelBuilder.Entity<Immobilisation>()
                 .Property(i => i.IdCategorie)
@@ -176,6 +157,14 @@ namespace GestionFournituresAPI.Data
             modelBuilder.Entity<Immobilisation>()
                 .Property(i => i.Statut)
                 .IsRequired(false);
+
+            modelBuilder.Entity<Immobilisation>(entity =>
+            {
+                entity.ToTable("IMMOBILISATIONS", "SYSTEM");
+                entity.Property(e => e.IdBien)
+                      .HasColumnName("ID_BIEN")
+                      .HasDefaultValueSql("SYSTEM.IMMOBILISATIONS_SEQ.NEXTVAL");
+            });
         }
     }
 }

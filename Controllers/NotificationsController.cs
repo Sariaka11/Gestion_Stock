@@ -4,6 +4,7 @@ using GestionFournituresAPI.Data;
 using GestionFournituresAPI.Models;
 using System;
 using System.Threading.Tasks;
+using System.Collections.Generic;
 
 namespace GestionFournituresAPI.Controllers
 {
@@ -52,7 +53,7 @@ namespace GestionFournituresAPI.Controllers
                 // Vérifier la fourniture ou le bien
                 decimal quantiteRestante = 0;
                 string itemNom = "";
-               if (createDto.FournitureId.HasValue)
+                if (createDto.FournitureId.HasValue)
                 {
                     var fourniture = await _context.AgenceFournitures
                         .Include(af => af.Fourniture)
@@ -62,7 +63,7 @@ namespace GestionFournituresAPI.Controllers
                         Console.WriteLine($"Fourniture non trouvée: Id={createDto.FournitureId}");
                         return BadRequest("La fourniture spécifiée n'existe pas pour cette agence.");
                     }
-                    quantiteRestante = fourniture.Quantite; // Quantite est int non-nullable
+                    quantiteRestante = fourniture.Quantite;
                     itemNom = fourniture.Fourniture?.Nom ?? "Fourniture inconnue";
                 }
                 else if (createDto.BienId.HasValue)
@@ -75,7 +76,7 @@ namespace GestionFournituresAPI.Controllers
                         Console.WriteLine($"Bien non trouvé: Id={createDto.BienId}");
                         return BadRequest("Le bien spécifié n'existe pas pour cette agence.");
                     }
-                    quantiteRestante = bien.Quantite.GetValueOrDefault(0); // Remplacé ?? par GetValueOrDefault
+                    quantiteRestante = bien.Quantite.GetValueOrDefault(0);
                     itemNom = bien.Immobilisation?.NomBien ?? "Bien inconnu";
                 }
                 else
@@ -95,7 +96,7 @@ namespace GestionFournituresAPI.Controllers
                     Titre = $"Demande de {agence.Nom} par {createDto.UserName}",
                     Corps = $"Demande d'envoi pour {itemNom} avec un stock restant de {quantiteRestante} en date du {DateTime.UtcNow:yyyy-MM-dd}.",
                     DateDemande = DateTime.UtcNow,
-                    Statut = "En attente"
+                    Statut = "Non vue" // Changement de "En attente" à "Non vue"
                 };
 
                 _context.Notifications.Add(notification);
@@ -168,6 +169,32 @@ namespace GestionFournituresAPI.Controllers
             catch (Exception ex)
             {
                 Console.WriteLine($"Erreur dans GetNotification: {ex.Message}\nStackTrace: {ex.StackTrace}\nInnerException: {ex.InnerException?.Message}");
+                return StatusCode(500, $"Erreur serveur: {ex.Message}");
+            }
+        }
+
+        // PUT: api/Notifications/{id}/mark-as-read
+        [HttpPut("{id}/mark-as-read")]
+        public async Task<IActionResult> MarkNotificationAsRead(int id)
+        {
+            try
+            {
+                var notification = await _context.Notifications.FindAsync(id);
+                if (notification == null)
+                {
+                    Console.WriteLine($"Notification non trouvée: Id={id}");
+                    return NotFound();
+                }
+
+                notification.Statut = "Vue";
+                await _context.SaveChangesAsync();
+                Console.WriteLine($"Notification marquée comme vue: Id={id}");
+
+                return NoContent();
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Erreur dans MarkNotificationAsRead: {ex.Message}\nStackTrace: {ex.StackTrace}\nInnerException: {ex.InnerException?.Message}");
                 return StatusCode(500, $"Erreur serveur: {ex.Message}");
             }
         }
