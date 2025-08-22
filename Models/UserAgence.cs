@@ -3,7 +3,7 @@ using System.ComponentModel.DataAnnotations.Schema;
 
 namespace GestionFournituresAPI.Models
 {
-    [Table("USER_AGENCE", Schema = "SYSTEM")]
+    [Table("USER_AGENCE")]
     public class UserAgence
     {
         [Key]

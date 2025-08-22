@@ -3,7 +3,7 @@ using System.ComponentModel.DataAnnotations.Schema;
 
 namespace GestionFournituresAPI.Models
 {
-    [Table("ENTREE_FOURNITURES", Schema = "SYSTEM")]
+    [Table("ENTREE_FOURNITURES")]
     public class EntreeFourniture
     {
         [Key]

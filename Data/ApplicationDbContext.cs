@@ -71,7 +71,7 @@ namespace GestionFournituresAPI.Data
             // Configuration pour Notification
             modelBuilder.Entity<Notification>(entity =>
             {
-                entity.ToTable("NOTIFICATIONS", "SYSTEM");
+                entity.ToTable("NOTIFICATIONS");
                 entity.HasKey(e => e.Id);
                 entity.Property(e => e.Id)
                       .HasColumnName("ID")
@@ -160,7 +160,7 @@ namespace GestionFournituresAPI.Data
 
             modelBuilder.Entity<Immobilisation>(entity =>
             {
-                entity.ToTable("IMMOBILISATIONS", "SYSTEM");
+                entity.ToTable("IMMOBILISATIONS");
                 entity.Property(e => e.IdBien)
                       .HasColumnName("ID_BIEN")
                       .HasDefaultValueSql("SYSTEM.IMMOBILISATIONS_SEQ.NEXTVAL");

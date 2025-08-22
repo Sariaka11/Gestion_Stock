@@ -51,7 +51,7 @@ namespace back.Migrations
                     b.HasIndex("Numero")
                         .IsUnique();
 
-                    b.ToTable("AGENCES", "SYSTEM");
+                    b.ToTable("AGENCES");
                 });
 
             modelBuilder.Entity("GestionFournituresAPI.Models.AgenceFourniture", b =>
@@ -131,7 +131,7 @@ namespace back.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("FOURNITURES", "SYSTEM");
+                    b.ToTable("FOURNITURES");
                 });
 
             modelBuilder.Entity("GestionFournituresAPI.Models.User", b =>

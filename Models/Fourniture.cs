@@ -4,7 +4,7 @@ using System.Collections.Generic;
 
 namespace GestionFournituresAPI.Models
 {
-    [Table("FOURNITURES", Schema = "SYSTEM")]
+    [Table("FOURNITURES")]
     public class Fourniture
     {
         [Key]

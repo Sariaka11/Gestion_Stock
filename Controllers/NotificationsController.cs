@@ -85,9 +85,17 @@ namespace GestionFournituresAPI.Controllers
                     return BadRequest("Une fourniture ou un bien doit être spécifié.");
                 }
 
-                // Créer la notification
+                // SOLUTION : Générer l'ID manuellement
+                int nextId = 1;
+                if (await _context.Notifications.AnyAsync())
+                {
+                    nextId = await _context.Notifications.MaxAsync(n => n.Id) + 1;
+                }
+
+                // Créer la notification avec l'ID généré
                 var notification = new Notification
                 {
+                    Id = nextId, // Définir l'ID manuellement
                     UserId = createDto.UserId,
                     UserName = createDto.UserName,
                     AgenceId = createDto.AgenceId,
@@ -96,12 +104,26 @@ namespace GestionFournituresAPI.Controllers
                     Titre = $"Demande de {agence.Nom} par {createDto.UserName}",
                     Corps = $"Demande d'envoi pour {itemNom} avec un stock restant de {quantiteRestante} en date du {DateTime.UtcNow:yyyy-MM-dd}.",
                     DateDemande = DateTime.UtcNow,
-                    Statut = "Non vue" // Changement de "En attente" à "Non vue"
+                    Statut = "Non vue"
                 };
 
                 _context.Notifications.Add(notification);
-                await _context.SaveChangesAsync();
-                Console.WriteLine($"Notification créée: Id={notification.Id}");
+
+                // Utiliser une transaction pour éviter les problèmes de concurrence
+                using (var transaction = await _context.Database.BeginTransactionAsync())
+                {
+                    try
+                    {
+                        await _context.SaveChangesAsync();
+                        await transaction.CommitAsync();
+                        Console.WriteLine($"Notification créée: Id={notification.Id}");
+                    }
+                    catch (Exception)
+                    {
+                        await transaction.RollbackAsync();
+                        throw;
+                    }
+                }
 
                 return CreatedAtAction(nameof(GetNotification), new { id = notification.Id }, notification);
             }
@@ -111,6 +133,7 @@ namespace GestionFournituresAPI.Controllers
                 return StatusCode(500, $"Erreur serveur: {ex.Message}");
             }
         }
+
 
         // GET: api/Notifications
         [HttpGet]
